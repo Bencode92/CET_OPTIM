@@ -254,6 +254,8 @@ function App() {
   const [txAdhCET, setTxAdhCET] = useState(50);
   const [txChoixPERCOL, setTxChoixPERCOL] = useState(40);
   const [coutMiseEnPlace, setCoutMiseEnPlace] = useState(50000);
+  const [pctEligible, setPctEligible] = useState(70);
+  const [tauxHoraire, setTauxHoraire] = useState(15);
 
   // Auto-load from GitHub
   useEffect(() => {
@@ -301,55 +303,87 @@ function App() {
     return {name:p+'%', gM:g, gA:g*12, gX:g*12*xf};
   }), [data,xf]);
 
-  // ─── PERCOL (spec v2 : 2 taux adhésion, flux euro par euro) ─────
+  // ─── PERCOL (spec v3 : pctEligible, tauxHoraire, plafonds, 2 scénarios FS) ─────
   const percol = useMemo(() => {
     const rS = txSalarie/100, rE = txEtt/100, fs = fSocial/100;
     const pAdhCET = txAdhCET/100, pChoixP = txChoixPERCOL/100;
     const txEffectif = pAdhCET * pChoixP;
 
-    // Pool CET ajusté par adhésion
-    const cetMensuelAjuste = tot.cet * pAdhCET;
-    const cetAnnuelAjuste = cetMensuelAjuste * 12;
-    const nbAdhCET = Math.round(tot.n * pAdhCET);
+    // Eligible pool reduced by pctEligible (910h rule)
+    const nbEligibles = Math.round(tot.n * pctEligible/100);
+    const nbAdhCET = Math.round(nbEligibles * pAdhCET);
     const nbPercol = Math.round(nbAdhCET * pChoixP);
     const nbCash = nbAdhCET - nbPercol;
 
-    // --- Pool PERCOL ---
-    const poolP = cetAnnuelAjuste * pChoixP;
-    const gainPlacP = poolP * rE;
-    const rendVerseP = poolP * rS;
+    // Valeur jour and plafonds
+    const valeurJour = tauxHoraire * 7;
+    const plafondICCPEntree = 10 * valeurJour; // per year per worker
+    const plafondPERCOL = 10 * valeurJour; // per year per worker
+
+    // Average CET per worker from file (monthly)
+    const cetMoyMoisBrut = tot.n > 0 ? tot.cet / tot.n : 0;
+    // Split into IFM (unlimited) and ICCP (capped at plafondICCPEntree/12 per month)
+    const ifmMoy = tot.n > 0 ? tot.ifm * (pctIfm/100) / tot.n : 0;
+    const iccpMoy = tot.n > 0 ? tot.iccp * (pctIccp/100) / tot.n : 0;
+    const iccpMoyCapped = Math.min(iccpMoy, plafondICCPEntree / 12);
+    const cetMoyMois = ifmMoy + iccpMoyCapped;
+
+    // Pool CET adjusted by number of CET adherents
+    const cetMensuelAjuste = cetMoyMois * nbAdhCET;
+    const cetAnnuelAjuste = cetMensuelAjuste * 12;
+
+    // Per-worker annual CET
+    const cetMoyAn = cetMoyMois * 12;
+
+    // Pool PERCOL per worker capped at plafondPERCOL
+    const cetAnnuelPerWorkerForPercol = Math.min(cetMoyAn, plafondPERCOL);
+    const excessPerWorker = Math.max(0, cetMoyAn - plafondPERCOL);
+
+    // Pools
+    const poolP = cetAnnuelPerWorkerForPercol * nbPercol;
+    const poolExcess = excessPerWorker * nbPercol; // excess goes to cash (full cotisations)
+    const poolC = cetMoyAn * nbCash; // cash workers pay full cotisations
+
+    // Étage 1: RGDU — gain potentiel si sortie PERCOL (pas de réintégration)
+    const gainRGDU = tot.gain * pAdhCET * 12;
+
+    // Étage 2: Spread trésorerie (rendement simple, pas d'abondement)
+    const spreadReel = cetAnnuelAjuste * (rE - rS);
+
+    // Étage 3: SS cotisations evitees only (25%)
+    const tauxCotisSSEvitees = 0.25;
+    const poolPercolTotal = poolP; // only PERCOL workers, capped
+    // Sans forfait social
+    const econE3SansFS = poolPercolTotal * tauxCotisSSEvitees;
+    // Avec forfait social
+    const econE3AvecFS = poolPercolTotal * (tauxCotisSSEvitees - fs);
+
+    // Legacy fields for backward compat
+    const spreadTotal = spreadReel;
+    const gainNetEtage3 = econE3SansFS;
+    const gainNetEtage3AvecFS = econE3AvecFS;
+    const gainTotal = gainRGDU + spreadReel + econE3SansFS;
+    const gainTotalPrudent = gainRGDU + spreadReel + econE3AvecFS;
+
+    // Legacy pool fields
+    const gainPlacP = poolP * rE, rendVerseP = poolP * rS;
     const montantTransfP = poolP + rendVerseP;
     const forfaitPaye = montantTransfP * fs;
-    const coutPERCOL = forfaitPaye + rendVerseP - gainPlacP;
+    const coutPERCOL = forfaitPaye;
     const coutCashRefP = poolP * COTIS;
-    const econPERCOL = coutCashRefP - coutPERCOL;
-
-    // --- Pool Cash ---
-    const poolC = cetAnnuelAjuste * (1 - pChoixP);
-    const gainPlacC = poolC * rE;
-    const rendVerseC = poolC * rS;
+    const econPERCOL = econE3SansFS;
+    const gainPlacC = poolC * rE, rendVerseC = poolC * rS;
     const cotisPayeC = (poolC + rendVerseC) * COTIS;
-    const coutCETCash = cotisPayeC + rendVerseC - gainPlacC;
+    const coutCETCash = cotisPayeC;
     const coutCashRefC = poolC * COTIS;
-    const surcoutCash = coutCETCash - coutCashRefC;
+    const surcoutCash = 0;
 
-    // --- 3 étages ---
-    const gainNetEtage3 = econPERCOL - surcoutCash;
-    const gainRGDU = tot.gain * pAdhCET * 12;
-    const spreadTotal = (rE - rS) * cetAnnuelAjuste;
-    const gainTotal = gainRGDU + spreadTotal + gainNetEtage3;
-
-    // Per-worker breakdown (for display cards)
-    const cetMoyMois = tot.n>0 ? tot.cet/tot.n : 0;
-    const cetMoyAn = cetMoyMois * 12;
+    // Per-worker breakdown
     const rendVerseUnit = cetMoyAn * rS;
     const gainPlacUnit = cetMoyAn * rE;
-    // Étage 3 : Cash = 48% cotis | PERCOL = forfait social sur (principal + rendement versé)
     const coutCashUnit = cetMoyAn * COTIS;
-    const coutPercolUnit = (cetMoyAn + rendVerseUnit) * fs; // juste le forfait social
-    // L'économie étage 3 = cotis cash évitées - forfait social payé
+    const coutPercolUnit = (cetMoyAn + rendVerseUnit) * fs;
     const econPercolUnit = coutCashUnit - coutPercolUnit;
-    // Spread tréso (étage 2) = séparé
     const spreadUnit = (rE - rS) * cetMoyAn;
     const perWorker = {
       cetAn: cetMoyAn, rendVerse: rendVerseUnit, gainPlac: gainPlacUnit,
@@ -357,38 +391,47 @@ function App() {
       econPercol: econPercolUnit, spreadUnit,
     };
 
-    // Sensibilité par levier (calcul du gain total en variant UN paramètre à la fois)
-    function calcTotal(pa,pp,rr,f) {
-      const ca=tot.cet*pa*12, pP=ca*pp, pC=ca*(1-pp);
-      const cpP=(pP+pP*rr)*f+pP*rr-pP*rE, cpC=(pC+pC*rr)*COTIS+pC*rr-pC*rE;
-      const eP=pP*COTIS-cpP, sC=cpC-pC*COTIS;
-      return tot.gain*pa*12 + (rE-rr)*ca + eP - sC;
+    // Sensibilité par levier
+    function calcTotal(pa,pp,rr,f,pe,th) {
+      const ne = Math.round(tot.n * pe/100);
+      const na = Math.round(ne * pa), np = Math.round(na * pp);
+      const vj = th * 7, plP = 10 * vj;
+      const ifmW = tot.n>0 ? tot.ifm*(pctIfm/100)/tot.n : 0;
+      const iccpW = tot.n>0 ? Math.min(tot.iccp*(pctIccp/100)/tot.n, 10*vj/12) : 0;
+      const cetW = (ifmW + iccpW) * 12;
+      const ca = cetW * na;
+      const g1 = tot.gain * pa * 12; // RGDU actif
+      const spr = ca * (rE - rr);
+      const ppoolW = Math.min(cetW, plP);
+      const e3sans = ppoolW * np * 0.25;
+      return g1 + spr + e3sans;
     }
     const leviers = [
       {nom:'Adhésion CET', param:'adhCET', vals:[20,30,40,50,60,70,80], unit:'%',
-       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(v/100,pChoixP,rS,fs)}))},
+       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(v/100,pChoixP,rS,fs,pctEligible,tauxHoraire)}))},
       {nom:'Choix PERCOL', param:'choixP', vals:[20,30,40,50,60,70,80], unit:'%',
-       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,v/100,rS,fs)}))},
+       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,v/100,rS,fs,pctEligible,tauxHoraire)}))},
       {nom:'Rendement salarié', param:'rendS', vals:[1,2,3,4,5,6], unit:'%',
-       data: [1,2,3,4,5,6].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,v/100,fs)}))},
+       data: [1,2,3,4,5,6].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,v/100,fs,pctEligible,tauxHoraire)}))},
       {nom:'Forfait social', param:'fs', vals:[16,18,20], unit:'%',
-       data: [16,18,20].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,rS,v/100)}))},
+       data: [16,18,20].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,rS,v/100,pctEligible,tauxHoraire)}))},
     ];
-    // Impact marginal de chaque levier (variation de +10pp ou +1pp)
     const impacts = leviers.map(l => {
-      const baseG = gainTotal;
       const vals = l.data.map(d=>d.gain);
       const maxG = Math.max(...vals), minG = Math.min(...vals);
-      return {...l, range: maxG - minG, base: baseG};
+      return {...l, range: maxG - minG, base: gainTotal};
     }).sort((a,b)=>b.range-a.range);
 
     return {
-      nbAdhCET, nbPercol, nbCash, txEffectif, cetMensuelAjuste, cetAnnuelAjuste,
-      poolP, poolC, gainPlacP, rendVerseP, montantTransfP, forfaitPaye, coutPERCOL, coutCashRefP, econPERCOL,
+      nbEligibles, nbAdhCET, nbPercol, nbCash, txEffectif, cetMensuelAjuste, cetAnnuelAjuste,
+      poolP, poolC, poolExcess, gainPlacP, rendVerseP, montantTransfP, forfaitPaye, coutPERCOL, coutCashRefP, econPERCOL,
       gainPlacC, rendVerseC, cotisPayeC, coutCETCash, coutCashRefC, surcoutCash,
-      gainNetEtage3, gainRGDU, spreadTotal, gainTotal, perWorker, leviers, impacts,
+      gainNetEtage3, gainNetEtage3AvecFS, econE3SansFS, econE3AvecFS,
+      gainRGDU, spreadTotal, spreadReel, gainTotal, gainTotalPrudent,
+      valeurJour, plafondPERCOL, plafondICCPEntree, tauxCotisSSEvitees,
+      perWorker, leviers, impacts,
     };
-  }, [tot,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL]);
+  }, [tot,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraire,pctIfm,pctIccp]);
 
   const has = data.length > 0;
 
@@ -604,20 +647,21 @@ function App() {
             <thead><tr><th style={S.th}>Source d'économie</th><th style={{...S.th,...S.tdR}}>Gain annuel</th><th style={{...S.th,...S.tdR}}>Part</th></tr></thead>
             <tbody>
               {[
-                ['Réduction de charges (allègement)',percol.gainRGDU,'#3b82f6'],
+                ['Réduction de charges (allègement RGDU)',percol.gainRGDU,'#3b82f6'],
                 ['Marge de placement (12 mois)',percol.spreadTotal,'#8b5cf6'],
-                ['Plan retraite ('+fSocial+'% au lieu de 48%)',percol.gainNetEtage3,'#22c55e'],
+                ['Plan retraite sans forfait social',percol.econE3SansFS,'#22c55e'],
+                ['Plan retraite avec forfait social '+fSocial+'%',percol.econE3AvecFS,'#16a34a'],
               ].map(([l,v,c])=>(
                 <tr key={l} style={{borderBottom:'1px solid #1e293b'}}>
                   <td style={{padding:'10px 0',display:'flex',alignItems:'center',gap:8}}><div style={{width:10,height:10,borderRadius:3,background:c}}/>{l}</td>
                   <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:c,fontSize:16}}>{fmtE(v)}</td>
-                  <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',color:'#94a3b8'}}>{percol.gainTotal>0?(v/percol.gainTotal*100).toFixed(0)+'%':'—'}</td>
+                  <td/>
                 </tr>
               ))}
-              <tr style={{borderTop:'2px solid #22c55e'}}>
-                <td style={{padding:'12px 0',fontWeight:700,color:'#22c55e',fontSize:16}}>TOTAL</td>
-                <td style={{...S.tdR,padding:'12px 0',fontFamily:'monospace',fontWeight:800,color:'#22c55e',fontSize:22}}>{fmtE(percol.gainTotal)}</td>
-                <td style={{...S.tdR,padding:'12px 0',fontFamily:'monospace',fontWeight:700,color:'#22c55e'}}>100%</td>
+              <tr style={{borderTop:'2px solid #22c55e',background:'#052e16'}}>
+                <td style={{padding:'12px 0',fontWeight:700,color:'#22c55e',fontSize:14}}>TOTAL (optimiste / prudent)</td>
+                <td style={{...S.tdR,padding:'12px 0',fontFamily:'monospace',fontWeight:800,color:'#22c55e',fontSize:20}}>{fmtE(percol.gainTotal)} / {fmtE(percol.gainTotalPrudent)}</td>
+                <td/>
               </tr>
             </tbody>
           </table>
@@ -626,10 +670,12 @@ function App() {
         {/* S5: Sliders simplifiés */}
         <div style={S.card}>
           <div style={{fontWeight:600,color:'#fff',fontSize:15,marginBottom:16}}>Ajustez les hypothèses</div>
-          <div style={S.grid(3)}>
+          <div style={S.grid(5)}>
             <PBar label="Part des primes épargnées" value={pctIfm} onChange={onPctPrimes} min={10} max={100} step={5}/>
-            <PBar label="Intérimaires participants" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
-            <PBar label="Choix du plan retraite" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
+            <PBar label="Éligibles (910h)" value={pctEligible} onChange={setPctEligible} min={20} max={100} step={5}/>
+            <PBar label="Participants au CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
+            <PBar label="Choix plan retraite" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
+            <PBar label="Taux horaire moyen" value={tauxHoraire} onChange={setTauxHoraire} min={10} max={35} step={1} unit=" €/h"/>
           </div>
         </div>
 
@@ -672,6 +718,17 @@ function App() {
         <div style={{...S.card,background:'#0f172a',borderLeft:'4px solid #8b5cf6'}}>
           <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>Détail technique — Pour le DAF et l'expert paie</div>
           <div style={{fontSize:12,color:'#94a3b8',marginTop:4}}>Cette page contient le détail des calculs. Pour la vue résumée, voir l'onglet <span style={{color:'#22c55e',cursor:'pointer',textDecoration:'underline'}} onClick={()=>setTab(3)}>Vue d'ensemble</span>.</div>
+        </div>
+
+        {/* Warning 1 mois + plafonds */}
+        <div style={{padding:14,background:'#1c1107',border:'1px solid #854d0e',borderRadius:12,marginBottom:20,fontSize:12,color:'#fbbf24',lineHeight:1.6}}>
+          <strong>Données sur 1 mois</strong> — Le plafond ICCP (10 jours-équivalent/an) est simulé au prorata mensuel. Taux horaire moyen : {tauxHoraire} €/h → 1 jour = {tauxHoraire*7} € → plafond ICCP = {fmtE(percol.plafondICCPEntree)}/an ({fmtE2(percol.plafondICCPEntree/12)}/mois). Plafond PERCOL sortie = {fmtE(percol.plafondPERCOL)}/an par salarié.
+        </div>
+
+        {/* Sliders éligibilité + taux horaire */}
+        <div style={{...S.card,...S.grid(2)}}>
+          <PBar label="% éligibles (910h ancienneté)" value={pctEligible} onChange={setPctEligible} min={20} max={100} step={5}/>
+          <PBar label="Taux horaire moyen" value={tauxHoraire} onChange={setTauxHoraire} min={10} max={35} step={1} unit=" €/h"/>
         </div>
 
         {/* ──── 1. HEADLINE : le résultat ──────────────────────────── */}
