@@ -34,23 +34,13 @@
 
     var RGDU={smicHoraire:12.02,seuil:3,tMin:0.02,tMax:0.4013,tDelta:0.3813,puissance:1.75};
     var COTIS=0.48;
-    var REPO='Bencode92/CET_OPTIM';
-    var DATA_PATH='data/historique/latest_marges.csv';
+    var PROXY='https://studyforge-proxy.benoit-comas.workers.dev';
+    var GH_PATH='Bencode92/CET_OPTIM/contents/data/historique/latest_marges.csv';
     var TAB_NAMES=['Upload','Simulation','Graphiques','Synth\u00e8se','PERCOL'];
 
-    // ─── GitHub API helpers ───────────────────────────────────────────
-    function getToken(){return localStorage.getItem('gh_token')||'';}
-    function setToken(t){localStorage.setItem('gh_token',t);}
-
-    function ghFetch(path,opts){
-      var tk=getToken();
-      var headers={'Accept':'application/vnd.github.v3+json'};
-      if(tk) headers['Authorization']='token '+tk;
-      return fetch('https://api.github.com/repos/'+REPO+'/contents/'+path,Object.assign({headers:headers},opts||{}));
-    }
-
+    // ─── GitHub via Cloudflare proxy ──────────────────────────────────
     function loadFromGitHub(){
-      return ghFetch(DATA_PATH).then(function(r){
+      return fetch(PROXY+'/github/'+GH_PATH).then(function(r){
         if(!r.ok) throw new Error('not found');
         return r.json();
       }).then(function(json){
@@ -60,16 +50,13 @@
     }
 
     function saveToGitHub(csvContent){
-      var tk=getToken();
-      if(!tk) return Promise.reject(new Error('Token GitHub requis'));
-      // Get existing file SHA first
-      return ghFetch(DATA_PATH).then(function(r){
+      return fetch(PROXY+'/github/'+GH_PATH).then(function(r){
         if(r.ok) return r.json().then(function(j){return j.sha;});
         return null;
       }).then(function(sha){
         var body={message:'data: update marges CSV ('+new Date().toISOString().slice(0,10)+')',content:btoa(unescape(encodeURIComponent(csvContent)))};
         if(sha) body.sha=sha;
-        return ghFetch(DATA_PATH,{method:'PUT',body:JSON.stringify(body)});
+        return fetch(PROXY+'/github/'+GH_PATH,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       }).then(function(r){
         if(!r.ok) return r.json().then(function(j){throw new Error(j.message||'Erreur GitHub');});
         return r.json();
@@ -158,8 +145,6 @@
       var _fs=useState(16),forfaitSocial=_fs[0],setForfaitSocial=_fs[1];
       var _rc=useState(3),rendementCet=_rc[0],setRendementCet=_rc[1];
       var _ta=useState(30),tauxAdhesion=_ta[0],setTauxAdhesion=_ta[1];
-      var _tk=useState(getToken()),token=_tk[0],setTokenState=_tk[1];
-      var _showTk=useState(!getToken()),showTokenInput=_showTk[0],setShowTokenInput=_showTk[1];
 
       // Auto-load from GitHub on mount
       useEffect(function(){
@@ -185,21 +170,15 @@
               var csvText=reader.result;
               setRawCsv(csvText);
               setData(parsed);setFileName(file.name);setActiveTab(1);
-              // Auto-save to GitHub
-              if(getToken()){
-                setMsg('Sauvegarde sur GitHub...');
-                saveToGitHub(csvText).then(function(){setMsg('\u2713 Sauvegard\u00e9 sur GitHub');setTimeout(function(){setMsg('');},3000);})
-                  .catch(function(err){setMsg('\u26a0 '+err.message);});
-              }
+              // Auto-save to GitHub via proxy
+              setMsg('Sauvegarde sur GitHub...');
+              saveToGitHub(csvText).then(function(){setMsg('\u2713 Sauvegard\u00e9 sur GitHub');setTimeout(function(){setMsg('');},3000);})
+                .catch(function(err){setMsg('\u26a0 '+err.message);});
             };
             reader.readAsText(file);
           }catch(err){setError(err.message);}
         });
       },[]);
-
-      var handleTokenSave=useCallback(function(){
-        setToken(token);setShowTokenInput(false);setMsg('\u2713 Token sauvegard\u00e9');setTimeout(function(){setMsg('');},2000);
-      },[token]);
 
       var simulated=useMemo(function(){return data.map(function(r){return computeRow(r,pctIfm/100,pctIccp/100);});},[data,pctIfm,pctIccp]);
       var totals=useMemo(function(){
@@ -302,20 +281,7 @@
             </label>
           </div>
 
-          <!-- GitHub token config -->
-          <div className="mt-6 bg-navy-800 rounded-xl border border-slate-700 p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm text-white">Sauvegarde GitHub</h3>
-              <button onClick=${function(){setShowTokenInput(!showTokenInput);}} className="text-xs text-slate-400 hover:text-green-400">${showTokenInput?'Masquer':'Configurer'}</button>
-            </div>
-            ${showTokenInput && html`<div className="space-y-2">
-              <p className="text-xs text-slate-400">Token GitHub (repo scope) pour sauvegarder les CSV dans data/historique/</p>
-              <input type="password" value=${token} onChange=${function(e){setTokenState(e.target.value);}}
-                placeholder="ghp_xxxxxxxxxxxx" className="w-full px-3 py-2 bg-navy-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:border-green-500 focus:outline-none" />
-              <button onClick=${handleTokenSave} className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Sauvegarder</button>
-            </div>`}
-            ${!showTokenInput && getToken() && html`<p className="text-xs text-green-400">\u2713 Token configur\u00e9 \u2014 les CSV seront sauvegard\u00e9s automatiquement</p>`}
-          </div>
+          <p className="mt-3 text-xs text-slate-500 text-center">Les CSV sont sauvegard\u00e9s automatiquement sur GitHub</p>
 
           <div className="mt-6 bg-navy-800 rounded-xl border border-slate-700 p-6">
             <h3 className="font-semibold mb-3 text-sm text-white">Param\u00e8tres RGDU 2026</h3>
