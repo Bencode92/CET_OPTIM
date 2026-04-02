@@ -114,19 +114,31 @@ function mapRows(rows) {
     reduction: det(cols,['réduction']) || det(cols,['reduction']),
     marge: cols.find(c => c.toLowerCase().trim() === 'marge'),
   };
-  const miss = ['hrs','brut','ifm','iccp'].filter(k => !cm[k]);
+  // IFM/ICCP columns may be absent in V2 files with only base rows
+  const miss = ['hrs','brut'].filter(k => !cm[k]);
   if (miss.length) throw new Error('Colonnes manquantes : ' + miss.join(', '));
-  return rows.map(r => ({
-    matricule: String(r[cm.matricule] ?? ''),
-    nom: String(r[cm.nom] ?? ''),
-    hrs: Number(r[cm.hrs]) || 0,
-    brut: Number(r[cm.brut]) || 0,
-    ifm: Number(r[cm.ifm]) || 0,
-    iccp: Number(r[cm.iccp]) || 0,
-    cotPat: cm.cotPat ? Number(r[cm.cotPat]) || 0 : 0,
-    redAct: cm.reduction ? Number(r[cm.reduction]) || 0 : 0,
-    marge: cm.marge ? Number(r[cm.marge]) || 0 : 0,
-  })).filter(r => r.hrs > 0 && r.ifm > 0);
+  return rows.map(r => {
+    let hrs = Number(r[cm.hrs]) || 0;
+    let brut = Number(r[cm.brut]) || 0;
+    let ifm = cm.ifm ? Number(r[cm.ifm]) || 0 : 0;
+    let iccp = cm.iccp ? Number(r[cm.iccp]) || 0 : 0;
+    let estime = false;
+    // Cas 2 : IFM vide/0 → brut réel = base pure, estimer IFM/ICCP
+    if (ifm === 0 && iccp === 0 && brut > 0) {
+      ifm = brut * 0.10;
+      iccp = brut * 0.11;
+      brut = brut * 1.21; // brut total = base × 1.21
+      estime = true;
+    }
+    return {
+      matricule: String(r[cm.matricule] ?? ''),
+      nom: String(r[cm.nom] ?? ''),
+      hrs, brut, ifm, iccp, estime,
+      cotPat: cm.cotPat ? Number(r[cm.cotPat]) || 0 : 0,
+      redAct: cm.reduction ? Number(r[cm.reduction]) || 0 : 0,
+      marge: cm.marge ? Number(r[cm.marge]) || 0 : 0,
+    };
+  }).filter(r => r.hrs > 0 && r.brut > 0);
 }
 
 // ─── GitHub via Cloudflare proxy ──────────────────────────────────────────
@@ -212,7 +224,7 @@ function App() {
   const [rawCsv, setRawCsv] = useState('');
   const [pctIfm, setPctIfm] = useState(30);
   const [pctIccp, setPctIccp] = useState(30);
-  const [effectif, setEffectif] = useState(660);
+  const [effectif, setEffectif] = useState(656);
   const [fSocial, setFSocial] = useState(16);
   const [rendCet, setRendCet] = useState(3);
   const [txAdh, setTxAdh] = useState(30);
@@ -329,8 +341,14 @@ function App() {
           <PBar label="% ICCP vers CET" value={pctIccp} onChange={setPctIccp}/>
           <NumInput label="Effectif total" value={effectif} onChange={setEffectif}/>
         </div>
-        <div style={{...S.grid(4),marginBottom:20}}>
-          {[['CET mensuel total',fmtE(tot.cet),'#3b82f6'],['Gain RGDU mensuel',fmtE2(tot.gain),'#22c55e'],['Gain annuel (fichier)',fmtE(gA),'#22c55e'],['Gain annuel extrapolé',fmtE(gX),'#f59e0b']].map(([l,v,c])=>(
+        <div style={{...S.grid(5),marginBottom:20}}>
+          {[
+            ['Salariés',tot.n+' ('+sim.filter(r=>!r.estime).length+' réels + '+sim.filter(r=>r.estime).length+' estimés)','#8b5cf6'],
+            ['CET mensuel total',fmtE(tot.cet),'#3b82f6'],
+            ['Gain RGDU mensuel',fmtE2(tot.gain),'#22c55e'],
+            ['Gain annuel',fmtE(gA),'#22c55e'],
+            ['Gain annuel extrapolé',fmtE(gX),'#f59e0b'],
+          ].map(([l,v,c])=>(
             <div key={l} style={S.kpi(c)}><div style={S.kpiLabel}>{l}</div><div style={S.kpiVal}>{v}</div></div>
           ))}
         </div>
@@ -345,11 +363,11 @@ function App() {
               {sim.slice(0,50).map((r,i)=>(
                 <tr key={i}>
                   <td style={{...S.td(i%2),...S.tdR,color:'#475569'}}>{i+1}</td>
-                  <td style={{...S.td(i%2),fontFamily:'monospace'}}>{r.matricule}</td>
+                  <td style={{...S.td(i%2),fontFamily:'monospace'}}>{r.matricule}{r.estime && <span style={{marginLeft:4,fontSize:9,padding:'1px 4px',borderRadius:3,background:'#7c3aed',color:'#fff',verticalAlign:'middle'}}>EST</span>}</td>
                   <td style={{...S.td(i%2),...S.tdR}}>{r.hrs}</td>
-                  <td style={{...S.td(i%2),...S.tdR}}>{fmtE2(r.brut)}</td>
-                  <td style={{...S.td(i%2),...S.tdR}}>{fmtE2(r.ifm)}</td>
-                  <td style={{...S.td(i%2),...S.tdR}}>{fmtE2(r.iccp)}</td>
+                  <td style={{...S.td(i%2),...S.tdR,color:r.estime?'#a78bfa':undefined}}>{fmtE2(r.brut)}</td>
+                  <td style={{...S.td(i%2),...S.tdR,color:r.estime?'#a78bfa':undefined}}>{fmtE2(r.ifm)}</td>
+                  <td style={{...S.td(i%2),...S.tdR,color:r.estime?'#a78bfa':undefined}}>{fmtE2(r.iccp)}</td>
                   <td style={{...S.td(i%2),...S.tdR,...S.blue}}>{fmtE2(r.cetIfm)}</td>
                   <td style={{...S.td(i%2),...S.tdR,...S.blue}}>{fmtE2(r.cetIccp)}</td>
                   <td style={{...S.td(i%2),...S.tdR,color:'#93c5fd',fontWeight:600}}>{fmtE2(r.cetTotal)}</td>
