@@ -255,7 +255,6 @@ function App() {
   const [txChoixPERCOL, setTxChoixPERCOL] = useState(40);
   const [coutMiseEnPlace, setCoutMiseEnPlace] = useState(50000);
   const [pctEligible, setPctEligible] = useState(70);
-  const [tauxHoraire, setTauxHoraire] = useState(15);
 
   // Auto-load from GitHub
   useEffect(() => {
@@ -289,10 +288,12 @@ function App() {
   // ─── Simulation ──────────────────────────────────────────────────
   const sim = useMemo(() => data.map(r => simRow(r, pctIfm/100, pctIccp/100)), [data,pctIfm,pctIccp]);
   const tot = useMemo(() => {
-    const t = {n:sim.length, hrs:0, brut:0, ifm:0, iccp:0, cet:0, rB:0, rC:0, gain:0};
-    sim.forEach(r => { t.hrs+=r.hrs; t.brut+=r.brut; t.ifm+=r.ifm; t.iccp+=r.iccp; t.cet+=r.cetTotal; t.rB+=r.redBase; t.rC+=r.redCet; t.gain+=r.gain; });
+    const t = {n:sim.length, hrs:0, brut:0, brutBase:0, ifm:0, iccp:0, cet:0, rB:0, rC:0, gain:0};
+    sim.forEach(r => { t.hrs+=r.hrs; t.brut+=r.brut; t.brutBase+=(r.brut-r.ifm-r.iccp); t.ifm+=r.ifm; t.iccp+=r.iccp; t.cet+=r.cetTotal; t.rB+=r.redBase; t.rC+=r.redCet; t.gain+=r.gain; });
     return t;
   }, [sim]);
+  // Taux horaire base calculé depuis les données (art. 6-3-2 : salaire brut horaire mission)
+  const tauxHoraireCalc = tot.hrs > 0 ? tot.brutBase / tot.hrs : 15;
 
   const xf = tot.n > 0 ? effectif / tot.n : 1;
   const gA = tot.gain * 12, gX = gA * xf;
@@ -316,7 +317,7 @@ function App() {
     const nbCash = nbAdhCET - nbPercol;
 
     // Valeur jour and plafonds
-    const valeurJour = tauxHoraire * 7;
+    const valeurJour = tauxHoraireCalc * 7;
     const plafondICCPEntree = 10 * valeurJour; // per year per worker
     const plafondPERCOL = 10 * valeurJour; // per year per worker
 
@@ -392,15 +393,15 @@ function App() {
     };
 
     // Sensibilité par levier
-    function calcTotal(pa,pp,rr,f,pe,th) {
+    function calcTotal(pa,pp,rr,f,pe) {
       const ne = Math.round(tot.n * pe/100);
       const na = Math.round(ne * pa), np = Math.round(na * pp);
-      const vj = th * 7, plP = 10 * vj;
+      const vj = tauxHoraireCalc * 7, plP = 10 * vj;
       const ifmW = tot.n>0 ? tot.ifm*(pctIfm/100)/tot.n : 0;
       const iccpW = tot.n>0 ? Math.min(tot.iccp*(pctIccp/100)/tot.n, 10*vj/12) : 0;
       const cetW = (ifmW + iccpW) * 12;
       const ca = cetW * na;
-      const g1 = tot.gain * pa * 12; // RGDU actif
+      const g1 = tot.gain * pa * 12;
       const spr = ca * (rE - rr);
       const ppoolW = Math.min(cetW, plP);
       const e3sans = ppoolW * np * 0.25;
@@ -408,13 +409,13 @@ function App() {
     }
     const leviers = [
       {nom:'Adhésion CET', param:'adhCET', vals:[20,30,40,50,60,70,80], unit:'%',
-       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(v/100,pChoixP,rS,fs,pctEligible,tauxHoraire)}))},
+       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(v/100,pChoixP,rS,fs,pctEligible)}))},
       {nom:'Choix PERCOL', param:'choixP', vals:[20,30,40,50,60,70,80], unit:'%',
-       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,v/100,rS,fs,pctEligible,tauxHoraire)}))},
+       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,v/100,rS,fs,pctEligible)}))},
       {nom:'Rendement salarié', param:'rendS', vals:[1,2,3,4,5,6], unit:'%',
-       data: [1,2,3,4,5,6].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,v/100,fs,pctEligible,tauxHoraire)}))},
+       data: [1,2,3,4,5,6].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,v/100,fs,pctEligible)}))},
       {nom:'Forfait social', param:'fs', vals:[16,18,20], unit:'%',
-       data: [16,18,20].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,rS,v/100,pctEligible,tauxHoraire)}))},
+       data: [16,18,20].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,rS,v/100,pctEligible)}))},
     ];
     const impacts = leviers.map(l => {
       const vals = l.data.map(d=>d.gain);
@@ -431,7 +432,7 @@ function App() {
       valeurJour, plafondPERCOL, plafondICCPEntree, tauxCotisSSEvitees,
       perWorker, leviers, impacts,
     };
-  }, [tot,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraire,pctIfm,pctIccp]);
+  }, [tot,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp]);
 
   const has = data.length > 0;
 
@@ -670,13 +671,13 @@ function App() {
         {/* S5: Sliders simplifiés */}
         <div style={S.card}>
           <div style={{fontWeight:600,color:'#fff',fontSize:15,marginBottom:16}}>Ajustez les hypothèses</div>
-          <div style={S.grid(5)}>
+          <div style={S.grid(4)}>
             <PBar label="Part des primes épargnées" value={pctIfm} onChange={onPctPrimes} min={10} max={100} step={5}/>
             <PBar label="Éligibles (910h)" value={pctEligible} onChange={setPctEligible} min={20} max={100} step={5}/>
             <PBar label="Participants au CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
             <PBar label="Choix plan retraite" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
-            <PBar label="Taux horaire moyen" value={tauxHoraire} onChange={setTauxHoraire} min={10} max={35} step={1} unit=" €/h"/>
           </div>
+          <div style={{marginTop:12,fontSize:11,color:'#64748b'}}>Taux horaire base : <strong style={{color:'#fff'}}>{tauxHoraireCalc.toFixed(2)} €/h</strong> (calculé depuis les données) → plafond PERCOL : <strong style={{color:'#22c55e'}}>{fmtE(percol.plafondPERCOL)}/an/salarié</strong></div>
         </div>
 
         {/* S6: ROI */}
@@ -722,13 +723,13 @@ function App() {
 
         {/* Warning 1 mois + plafonds */}
         <div style={{padding:14,background:'#1c1107',border:'1px solid #854d0e',borderRadius:12,marginBottom:20,fontSize:12,color:'#fbbf24',lineHeight:1.6}}>
-          <strong>Données sur 1 mois</strong> — Le plafond ICCP (10 jours-équivalent/an) est simulé au prorata mensuel. Taux horaire moyen : {tauxHoraire} €/h → 1 jour = {tauxHoraire*7} € → plafond ICCP = {fmtE(percol.plafondICCPEntree)}/an ({fmtE2(percol.plafondICCPEntree/12)}/mois). Plafond PERCOL sortie = {fmtE(percol.plafondPERCOL)}/an par salarié.
+          <strong>Données sur 1 mois</strong> — Le plafond ICCP (10 jours-équivalent/an) est simulé au prorata mensuel.<br/>
+          Taux horaire base calculé : <strong>{tauxHoraireCalc.toFixed(2)} €/h</strong> (brut base / heures, art. 6-3-2 accord 2000) → 1 jour = {(tauxHoraireCalc*7).toFixed(0)} € → plafond ICCP = {fmtE(percol.plafondICCPEntree)}/an ({fmtE2(percol.plafondICCPEntree/12)}/mois). Plafond PERCOL sortie = {fmtE(percol.plafondPERCOL)}/an par salarié.
         </div>
 
-        {/* Sliders éligibilité + taux horaire */}
-        <div style={{...S.card,...S.grid(2)}}>
+        {/* Slider éligibilité */}
+        <div style={S.card}>
           <PBar label="% éligibles (910h ancienneté)" value={pctEligible} onChange={setPctEligible} min={20} max={100} step={5}/>
-          <PBar label="Taux horaire moyen" value={tauxHoraire} onChange={setTauxHoraire} min={10} max={35} step={1} unit=" €/h"/>
         </div>
 
         {/* ──── 1. HEADLINE : le résultat ──────────────────────────── */}
