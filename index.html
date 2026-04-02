@@ -120,13 +120,29 @@
       return html`<canvas ref=${ref} height=${props.height||300}></canvas>`;
     }
 
-    // ─── Slider ───────────────────────────────────────────────────────
+    // ─── ProgressBar Slider ──────────────────────────────────────────
     function SliderParam(p){
       var mn=p.min!=null?p.min:0,mx=p.max!=null?p.max:100,st=p.step!=null?p.step:1,u=p.unit!=null?p.unit:'%';
+      var pct=((p.value-mn)/(mx-mn))*100;
       return html`<div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-slate-300">${p.label} : <span className="font-bold text-green-400">${p.value}${u}</span></label>
-        <input type="range" min=${mn} max=${mx} step=${st} value=${p.value} onChange=${function(e){p.onChange(Number(e.target.value));}} className="w-full accent-green-500" />
+        <div className="relative h-8 bg-navy-900 rounded-lg border border-slate-600 overflow-hidden cursor-pointer"
+          onClick=${function(e){var rect=e.currentTarget.getBoundingClientRect();var x=(e.clientX-rect.left)/rect.width;var val=mn+Math.round((x*(mx-mn))/st)*st;p.onChange(Math.max(mn,Math.min(mx,val)));}}>
+          <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-600 to-green-400 rounded-lg transition-all duration-150" style=${"width:"+pct+"%"}></div>
+          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow">${p.value}${u}</div>
+        </div>
+        <input type="range" min=${mn} max=${mx} step=${st} value=${p.value} onChange=${function(e){p.onChange(Number(e.target.value));}} className="w-full accent-green-500 h-1 opacity-0 absolute" style="pointer-events:none" />
         <div className="flex justify-between text-xs text-slate-500"><span>${mn}${u}</span><span>${mx}${u}</span></div>
+      </div>`;
+    }
+
+    // ─── Number Input ─────────────────────────────────────────────────
+    function NumberInput(p){
+      return html`<div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-slate-300">${p.label}</label>
+        <input type="number" min=${p.min||0} max=${p.max||99999} step=${p.step||1} value=${p.value}
+          onChange=${function(e){var v=parseInt(e.target.value)||0;p.onChange(Math.max(p.min||0,Math.min(p.max||99999,v)));}}
+          className="w-full px-4 py-2 bg-navy-900 border border-slate-600 rounded-lg text-lg font-bold text-green-400 text-center focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500" />
       </div>`;
     }
 
@@ -297,7 +313,7 @@
           <div className="bg-navy-800 rounded-xl border border-slate-700 p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
             <${SliderParam} label="% IFM vers CET" value=${pctIfm} onChange=${setPctIfm} />
             <${SliderParam} label="% ICCP vers CET" value=${pctIccp} onChange=${setPctIccp} />
-            <${SliderParam} label="Effectif total" value=${effectifTotal} onChange=${setEffectifTotal} min=${1} max=${5000} step=${10} unit="" />
+            <${NumberInput} label="Effectif total" value=${effectifTotal} onChange=${setEffectifTotal} min=${1} max=${99999} step=${1} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             ${[['CET mensuel total',fmtEur(totals.cetTotal),'border-blue-500 bg-blue-950/50'],['Gain RGDU mensuel',fmtEur2(totals.gain),'border-green-500 bg-green-950/50'],['Gain annuel (fichier)',fmtEur(gainAnnuel),'border-green-500 bg-green-950/50'],['Gain annuel extrapol\u00e9',fmtEur(gainExtrapole),'border-amber-500 bg-amber-950/50']].map(function(c){
