@@ -119,11 +119,18 @@ function parseFileData(arrayBuffer, fileName) {
 }
 
 // ─── Formatters ─────────────────────────────────────────────────────────────
-const fmtEur = (v) =>
-  v != null ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) : '—';
-const fmtEur2 = (v) =>
-  v != null ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
-const fmtPct = (v) => `${(v * 100).toFixed(0)} %`;
+const fmtEur = (v) => {
+  v = Number(v);
+  return isFinite(v) ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) : '0 \u20ac';
+};
+const fmtEur2 = (v) => {
+  v = Number(v);
+  return isFinite(v) ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00 \u20ac';
+};
+const fmtPct = (v) => {
+  v = Number(v);
+  return isFinite(v) ? `${(v * 100).toFixed(0)} %` : '0 %';
+};
 
 // ─── Slider Component ───────────────────────────────────────────────────────
 function SliderParam({ label, value, onChange, min = 0, max = 100, step = 1, unit = '%', tooltip }) {

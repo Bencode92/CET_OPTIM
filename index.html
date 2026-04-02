@@ -120,9 +120,9 @@
     }
 
     // ─── Formatters ───────────────────────────────────────────────────
-    function fmtEur(v){return v!=null?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}):'\u2014';}
-    function fmtEur2(v){return v!=null?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2}):'\u2014';}
-    function fmtPct(v){return(v*100).toFixed(0)+' %';}
+    function fmtEur(v){v=Number(v);return isFinite(v)?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}):'0 \u20ac';}
+    function fmtEur2(v){v=Number(v);return isFinite(v)?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2}):'0,00 \u20ac';}
+    function fmtPct(v){v=Number(v);return isFinite(v)?((v*100).toFixed(0)+' %'):'0 %';}
 
     // ─── Chart wrapper ────────────────────────────────────────────────
     Chart.defaults.color='#94a3b8';
