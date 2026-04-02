@@ -1,185 +1,157 @@
-# État des lieux — Ce qu'on sait et ce qu'on ne sait pas
+# ÉTAT DES LIEUX FINAL — Post analyse Prism'emploi
 
 **Date : 2 avril 2026**
-**Statut : En cours de validation — NE PAS LANCER avant réponses expert/rescrit**
+**Sources : Accord de branche 27/03/2000, Dépêche Prism'emploi N°22 (04/2023), Note juridique Prism'emploi (02/06/2025), BOSS n°985, DSS courrier 14/11/2012, Cour de cassation 22/10/2020**
 
 ---
 
-## CE QU'ON SAIT (confirmé par textes, expert, ou bulletins)
+## RÉSUMÉ EN 30 SECONDES
 
-### 1. La formule RGDU 2026 est validée
-
-Source : service-public.fr, vérifié le 21/02/2026.
-
-```
-C = Tmin + Tδ × [½ × (3 × SMIC × H / Brut − 1)]^1,75
-```
-
-Paramètres confirmés pour une entreprise < 50 salariés (FNAL 0,10%) :
-- Tmin = 0,0200
-- Tδ = 0,3781 (et non 0,3813 comme on utilisait — écart mineur)
-- Tmax = 0,3981
-- SMIC horaire = 12,02 €
-- Puissance = 1,75
-- Seuil extinction = 3 × SMIC
-
-**⚠ CORRECTION** : le site service-public.fr donne Tδ = 0,3781 pour < 50 salariés et non 0,3813 qu'on utilisait. Cet écart vient du fait qu'on avait utilisé les paramètres FNAL 0,50% (≥ 50 sal.) alors que vous avez 5 salariés permanents. À vérifier : pour le FNAL, c'est l'effectif total (intérimaires inclus) qui compte. Si ≥ 50 en ETP → FNAL 0,50% → Tδ = 0,3813. Si < 50 → FNAL 0,10% → Tδ = 0,3781.
-
-### 2. Le CET est dans l'assiette RGDU → Étage 1 = 0 €
-
-Source : service-public.fr (RGDU), texte exact :
-> "Sont pris en compte : rémunérations versées sur le compte épargne-temps (CET)"
-
-Confirmé par l'expert : les IFM/ICCP restent dans l'assiette RGDU que le salarié mette en CET ou non. Le coefficient RGDU ne change pas.
-
-**Conséquence : le gain RGDU de 103 K€/an qu'on simulait N'EXISTE PAS. L'onglet Simulation montre un gain théorique qui ne se matérialise pas en pratique.**
-
-### 3. Le transfert CET → PERCOL est exonéré de cotisations sécu
-
-Source : AG2R La Mondiale, Code du travail, Code de la sécurité sociale.
-
-Texte exact (AG2R) :
-> "Les droits CET transférés sur un PERCOL ne sont pas soumis aux cotisations de Sécurité sociale dans la limite de 16% du PASS par an et par épargnant."
-
-16% du PASS 2026 = 16% × 48 060 € = **7 690 €/an/salarié**.
-
-C'est l'exonération de cotisations sociales (pas juste l'IR). L'employeur paie uniquement le forfait social (16% ou 20%) au lieu des cotisations complètes (~48%).
-
-### 4. Le forfait social est de 16% sous conditions, sinon 20%
-
-Source : URSSAF (urssaf.fr, mis à jour 11/02/2026), service-public.fr.
-
-Conditions pour le 16% (cumulatives) :
-- PERCOL en gestion pilotée par défaut
-- Au moins 10% de titres éligibles PEA-PME dans le portefeuille
-
-Si ces conditions ne sont pas remplies → 20%.
-
-### 5. Le CET intérim est possible et encadré
-
-Source : accord de branche intérim (Prism'emploi), Code du travail.
-
-- Éligibilité : 910 heures sur 12 mois (accord de branche)
-- Éléments affectables : IFM, ICCP, primes conventionnelles, 13ème mois (selon accord)
-- Rendement observé chez les ETT : 5% à 8% brut
-- L'ETT qui met en place un CET doit le proposer à tous les intérimaires éligibles
-
-### 6. Le brut appliqué du fichier Marges = Base × 1,21
-
-Vérifié sur 367/368 lignes (écart < 0,05 €).
-
-Formule : Brut appliqué = (Brut réel − IFM − ICCP) × 1,21
-
-Où 1,21 = 1 + 10% IFM standard + 11% ICCP standard. C'est un concept managérial interne, pas le brut abattu du bulletin de paie.
-
-### 7. L'écart formule RGDU vs bulletin réel = facteur ~4,4
-
-Sur le bulletin Mourice Laure (206h, Brut 7 284,94 €) :
-- Formule théorique → 146 € de réduction
-- Bulletin réel → 33 €
-
-Cause non identifiée. Hypothèses : régularisation progressive, proratisation, paramètres FNAL différents. Les deltas (gains entre scénarios) sont proportionnellement fiables, mais les montants absolus sont surévalués.
-
-### 8. Le spread de trésorerie fonctionne
-
-L'ETT détient le cash CET, le place à un taux supérieur au rendement versé. Le spread est modeste (~0,3 point) mais sans risque.
-
-Estimation : ~8 K€/an sur un encours de ~2,5 M€.
+Le CET intérim fonctionne. Les cotisations sont bien différées. MAIS il y a deux plafonds distincts qu'on confondait : un plafond de 10 jours à l'ENTRÉE du CET (ICCP seulement, pas l'IFM) et un plafond de 10 jours à la SORTIE vers PERCOL. L'IFM n'a pas de limite à l'entrée. Le gain dépend de la passerelle PERCOL qui reste à valider par rescrit.
 
 ---
 
-## CE QU'ON NE SAIT PAS (à valider impérativement)
+## CE QU'ON SAIT MAINTENANT (confirmé par Prism'emploi)
 
-### ❓ Question 1 : Le plafond de 10 jours s'applique-t-il aux sommes monétaires ?
+### 1. Les cotisations sont DIFFÉRÉES — confirmé par 3 sources
 
-**Contexte** : L'article L.3334-8 du Code du travail limite à 10 jours/an le transfert CET → PERCOL pour l'exonération d'IR. Mais les IFM/ICCP sont des sommes monétaires, pas des jours de repos.
+**Note Prism'emploi juin 2025, page 8 :**
+> "Les sommes issues d'un CET ont la nature d'un élément de rémunération et entrent dans l'assiette des cotisations et contributions de sécurité sociale **au moment où elles sont versées au salarié intérimaire**."
 
-**Deux plafonds coexistent** :
-- Plafond 10 jours (article L.3334-8) → vise l'exonération d'impôt sur le revenu
-- Plafond 16% du PASS = 7 690 € (article L.3153-3 et CSS) → vise l'exonération de cotisations sociales
+**Conséquence :** quand l'intérimaire met ses IFM/ICCP en CET, l'ETT ne paie PAS les cotisations patronales ce mois-là. Les cotisations sont dues uniquement au moment de la sortie (déblocage cash ou transfert PERCOL). C'est le fondement de l'Étage 3.
 
-**Ce qu'on ne sait pas** : pour des sommes monétaires (IFM/ICCP), est-ce le plafond de 10 jours OU le plafond de 7 690 € qui s'applique pour l'exonération de cotisations sociales ?
+### 2. Deux plafonds DIFFÉRENTS qu'on confondait
 
-**Impact** :
-- Si plafond 10 jours → ~910 €/pers. transférable → gain PERCOL ~10-30 K€/an
-- Si plafond 7 690 € → ~4 000 €/pers. transférable (tout passe) → gain PERCOL ~150-220 K€/an
+**Plafond A — À l'ENTRÉE dans le CET (accord de branche art. 6-3-1) :**
+- IFM : **PAS DE LIMITE** — l'intérimaire peut mettre 100% de ses IFM en CET
+- ICCP : **limité à 10 jours-équivalent par an**
+- Heures de repos, CP, RTT : limités à 22 jours/an au cumul
 
-**Action** : rescrit URSSAF. C'est LA question qui détermine le business case.
+**Plafond B — À la SORTIE vers PERCOL (art. L.3334-8 Code du travail) :**
+- Transfert CET → PERCOL pour bénéficier de l'exonération : **10 jours/an maximum**
+- S'applique à TOUS les droits CET (IFM + ICCP + repos), pas seulement l'ICCP
 
-### ❓ Question 2 : Les cotisations patronales sur l'IFM/ICCP sont-elles différées avec le CET ?
+**ATTENTION** : ces deux plafonds sont DIFFÉRENTS et se cumulent :
+- L'IFM entre sans limite dans le CET
+- Mais à la sortie vers PERCOL, seuls 10 jours-équivalent sont exonérés (tous types confondus)
 
-**Contexte** : L'expert dit que les cotisations sont dues "au moment où elles sont dues (fin de mission)". Mais si l'intérimaire choisit de mettre en CET, les IFM/ICCP ne sont pas versées au salarié ce mois-là — elles sont créditées au CET.
+### 3. La conversion euros → jours est définie précisément
 
-**Ce qu'on ne sait pas** : les cotisations patronales sont-elles payées au moment du dépôt en CET (= fin de mission) ou au moment de la sortie du CET (= déblocage ou transfert PERCOL) ?
+**Accord de branche art. 6-3-2 :**
+> "Le montant des primes ou indemnités versées au CET par un intérimaire est transformé en jours (un jour = 7 heures) par division par le salaire brut horaire de la mission au titre de laquelle elles sont dues."
 
-**Impact** :
-- Si cotisations payées à l'entrée en CET → le CET est un simple report côté salarié, l'employeur paie ses charges immédiatement. Au transfert PERCOL, il n'y a PAS de nouvelle charge (déjà payée) mais PAS d'économie non plus.
-- Si cotisations différées à la sortie → à la sortie cash = cotisations complètes, à la sortie PERCOL = forfait social seulement. C'est dans ce cas que l'Étage 3 fonctionne.
+**Formule :** Jours-équivalent = Montant € / (Salaire brut horaire × 7)
 
-**Action** : demander à l'expert/gestionnaire de paie de montrer sur un bulletin réel ce qui se passe côté employeur quand un intérimaire dépose en CET. Les cotisations patronales figurent-elles sur le bulletin du mois du dépôt, ou sont-elles absentes ?
+**Exemple :** IFM de 500 € pour un intérimaire à 14 €/h → 500 / (14 × 7) = 500 / 98 = **5,1 jours**
 
-### ❓ Question 3 : Votre PERCOL est-il à 16% ou 20% de forfait social ?
+### 4. Les sommes CET sont rattachées à la DERNIÈRE mission pour la RGDU
 
-**Ce qu'on ne sait pas** : si votre PERCOL remplit les conditions de gestion pilotée + 10% PEA-PME.
+**BOSS allègements généraux n°985 + DSS courrier 14/11/2012 + Cass. 22/10/2020 :**
+> "Les IFM, jours de repos ou ICCP placés sur le CET et monétisés postérieurement doivent être intégrés à la rémunération prise en compte pour le calcul de la réduction de la dernière mission, même si les sommes issues du CET sont liées à de précédentes missions."
 
-**Impact** : 4 points de forfait social → ~30 K€/an de différence sur le scénario sans plafond.
+**Conséquence :** quand le CET est débloqué (cash ou PERCOL), les montants sont réintégrés dans l'assiette RGDU de la dernière mission. Ça ne change pas l'Étage 1 = 0 (les cotisations sont les mêmes, juste décalées dans le temps), mais ça confirme le mécanisme de report.
 
-**Action** : demander la fiche technique de votre PERCOL à votre gestionnaire d'épargne salariale.
+### 5. La fin de mission NE déclenche PAS le déblocage automatique
 
-### ❓ Question 4 : Le rendement CET est-il soumis à cotisations au crédit ou à la sortie ?
+**Accord de branche + Note Prism'emploi :**
+> "La fin d'un contrat de mission ne constitue pas un cas de déblocage automatique du CET, sauf demande du salarié intérimaire."
 
-**Ce qu'on ne sait pas** : quand l'ETT crédite 2,9% de rendement sur le CET, ce rendement est-il :
-- Soumis à cotisations patronales immédiatement (= coût de 2,9% × 1,48 = 4,3%)
-- Ou soumis seulement à la sortie (et donc potentiellement au forfait social si PERCOL)
+**Conséquence :** le CET reste en place entre les missions. L'ETT conserve le cash. Le spread de trésorerie fonctionne sur toute la durée de détention.
 
-**Impact** : si cotisé immédiatement, le rendement coûte plus cher et le spread est érodé.
+### 6. L'IFM et l'ICCP placées au CET sont payées à la fin de la mission SAUF demande contraire
 
-### ❓ Question 5 : L'accord de branche intérim exclut-il l'IFM du CET ?
+**Accord de branche art. 6-3-1 :**
+> "L'IFM et l'ICCP dues au titre des sommes placées au CET sont payées à la fin de la mission y ayant ouvert droit sauf demande contraire de l'intérimaire."
 
-**Contexte** : l'expert mentionne que l'IFM pourrait être exclue de l'extension de l'accord de branche. Mais en tant qu'ETT, vous pouvez rédiger votre propre accord d'entreprise CET qui réintègre l'IFM.
+**Interprétation :** C'est ambigu. Deux lectures possibles :
+- Lecture 1 : l'IFM/ICCP sont versées (et cotisées) à la fin de la mission, et c'est seulement le NET qui va au CET → les cotisations sont payées immédiatement
+- Lecture 2 : l'IFM/ICCP sont "dues" mais si l'intérimaire demande le CET, elles ne sont PAS versées et les cotisations sont différées
 
-**Ce qu'on ne sait pas** : avez-vous déjà un accord d'entreprise CET ? Si non, l'IFM est-elle couverte par l'accord de branche que vous appliquez ?
+La Note Prism'emploi page 8 tranche en faveur de la lecture 2 : "les sommes entrent dans l'assiette des cotisations **au moment où elles sont versées au salarié**". Si elles ne sont pas versées (car mises en CET), les cotisations ne sont pas dues à ce moment-là.
 
-**Action** : vérifier votre accord CET existant ou en négocier un.
+### 7. Condition d'ancienneté : 910 heures sur 12 mois
 
-### ❓ Question 6 : Le risque URSSAF de requalification est-il réel ?
+**Accord de branche art. 6-2 :**
+> "Les intérimaires sont susceptibles de bénéficier d'un CET dès lors qu'ils justifient d'une ancienneté de 910 heures au cours des 12 derniers mois."
 
-**Ce qu'on ne sait pas** : l'URSSAF a-t-elle déjà sanctionné des ETT utilisant le CET → PERCOL comme outil d'optimisation ?
+Un accord d'entreprise peut fixer une condition MOINS restrictive. 910h = environ 6 mois temps plein. Ça exclut les intérimaires très occasionnels.
 
-**Action** : le rescrit URSSAF couvre aussi ce risque — si la réponse est favorable, elle protège contre la requalification.
+**Impact sur le simulateur :** sur vos 641 intérimaires du mois de mars, il faudrait filtrer ceux qui ont 910h sur 12 mois. Ce n'est probablement pas 100%.
 
----
+### 8. L'abondement employeur est soumis à cotisations sécu
 
-## RÉSUMÉ DÉCISIONNEL
+**Note Prism'emploi page 6 :**
+> "L'ETT peut compléter, en temps ou en argent, les éléments placés par le salarié intérimaire dans le CET. Cet abondement, constituant un complément de rémunération, est soumis à cotisations de sécurité sociale."
 
-```
-┌─────────────────────────────────────┬───────────────┬────────────────────────┐
-│ Étage                               │ Gain estimé   │ Statut                 │
-├─────────────────────────────────────┼───────────────┼────────────────────────┤
-│ 1. RGDU (réduction assiette)        │ 0 €           │ ❌ CONFIRMÉ : ne       │
-│                                     │               │    fonctionne pas      │
-├─────────────────────────────────────┼───────────────┼────────────────────────┤
-│ 2. Spread trésorerie                │ ~8 K€/an      │ ✅ Fonctionne          │
-├─────────────────────────────────────┼───────────────┼────────────────────────┤
-│ 3. PERCOL (si plafond 7 690 €)      │ ~150-220 K€   │ ❓ Dépend du rescrit   │
-│ 3. PERCOL (si plafond 10 jours)     │ ~10-30 K€     │ ❓ Dépend du rescrit   │
-├─────────────────────────────────────┼───────────────┼────────────────────────┤
-│ TOTAL optimiste                     │ ~230 K€/an    │ ❓ Rescrit nécessaire   │
-│ TOTAL pessimiste                    │ ~18 K€/an     │                        │
-└─────────────────────────────────────┴───────────────┴────────────────────────┘
-```
+**Conséquence :** si vous abondez à 8% comme Randstad, ces 8% sont cotisés immédiatement. Ce n'est PAS du rendement gratuit — c'est un coût de 8% × 1,48 = 11,8% du montant CET.
 
-## PROCHAINES ÉTAPES (dans l'ordre)
+### 9. Délai d'utilisation du CET = 5 ans maximum
 
-1. **Semaine 1** : Vérifier votre accord CET (IFM incluse ?) et votre PERCOL (16% ou 20% ?)
-2. **Semaine 1** : Demander un bulletin réel avec dépôt CET pour voir si cotisations patronales sont différées ou payées immédiatement
-3. **Semaine 2** : Déposer le rescrit URSSAF avec la question double :
-   - Les sommes monétaires (IFM/ICCP) transférées du CET au PERCOL sont-elles soumises au plafond de 10 jours (art. L.3334-8) ?
-   - Le plafond de 16% du PASS pour l'exonération de cotisations sociales est-il bien le plafond opérant ?
-4. **Attendre le rescrit** (3-6 mois) avant d'engager les coûts de mise en place
-5. Si rescrit favorable → lancer la mise en place (accord CET, communication intérimaires)
-6. Si rescrit défavorable → évaluer si le gain de ~18 K€ justifie les coûts
+**Accord de branche art. 6-5-1 :**
+> "Le salarié intérimaire doit utiliser son CET avant l'expiration d'un délai de 5 ans à compter de la date à laquelle il a accumulé un nombre de jours égal à la durée minimale de 22 jours."
+
+Passé 5 ans, liquidation automatique (= paiement cash avec cotisations).
+
+### 10. Transfert inter-ETT possible mais limité
+
+**Accord de branche art. 6-7 :**
+Transfert possible uniquement vers une filiale du même groupe, et seulement si la filiale propose aussi un CET. En pratique, ça ne concerne pas ByCam/Cameleons (pas de filiale TT).
 
 ---
 
-*Document de travail — ne constitue pas un avis juridique*
+## CE QU'ON NE SAIT TOUJOURS PAS
+
+### ❓ Question centrale : Le plafond de 10 jours pour le transfert CET → PERCOL
+
+Le plafond de 10 jours à l'ENTRÉE dans le CET ne concerne que l'ICCP (pas l'IFM). Mais le plafond de 10 jours pour l'exonération lors du transfert CET → PERCOL (art. L.242-4-3 CSS + art. L.3334-8 C.trav) s'applique à TOUS les droits CET.
+
+**La question :** un intérimaire met 100% de ses IFM (pas de limite) + 10 jours d'ICCP dans le CET. Au total, il a peut-être 30 jours-équivalent en CET. Il transfère vers le PERCOL : seuls 10 jours sont exonérés de cotisations SS et d'IR. Les 20 jours restants sont cotisés normalement (comme un déblocage cash).
+
+**Impact chiffré :** avec un taux journalier moyen de ~175 € (25 €/h × 7h), le montant exonéré = 10 × 175 = 1 750 €/an/intérimaire. L'économie par intérimaire = différentiel cotisations évitées - forfait social payé.
+
+### ❓ Le forfait social s'applique-t-il sur les 10 jours exonérés ?
+
+L'expert Perplexity a dit que non ("les jours exonérés de cotisations SS ne sont pas assujettis au forfait social"). AG2R semble confirmer. Mais la Note Prism'emploi ne mentionne PAS le PERCOL du tout. C'est un silence inquiétant — soit parce que c'est évident, soit parce que les ETT ne font pas la passerelle PERCOL.
+
+### ❓ Combien de vos 641 intérimaires ont 910h d'ancienneté ?
+
+C'est un filtre important qu'on n'a pas dans les données. Si seulement 50% sont éligibles, ça divise le pool par deux.
+
+---
+
+## TABLEAU RÉCAPITULATIF FINAL
+
+| Étage | Mécanisme | Gain annuel | Statut | Source |
+|---|---|---|---|---|
+| 1. RGDU | CET réduit l'assiette → plus d'allègement | **0 €** | ❌ Mort | BOSS n°985 : CET dans l'assiette RGDU |
+| 2. Spread tréso | ETT place le cash CET, verse un rendement inférieur | **~8 K€** | ✅ Confirmé | Prism'emploi : cotis. différées |
+| 3a. PERCOL (sans forfait social sur 10j) | 10 jours exonérés de cotis. SS → économie ~25% × 1 750 €/pers. | **~84 K€** (avec 192 adhérents) | ❓ Rescrit nécessaire | Art. L.242-4-3 CSS |
+| 3b. PERCOL (avec forfait social 16% sur 10j) | 10 jours : économie (25% - 16%) × 1 750 €/pers. | **~30 K€** (avec 192 adhérents) | ❓ Rescrit nécessaire | |
+| **TOTAL optimiste** | | **~92 K€** | | |
+| **TOTAL prudent** | | **~38 K€** | | |
+
+---
+
+## PLAN D'ACTION RÉVISÉ
+
+### Phase 1 — Immédiate (sans risque, sans rescrit)
+1. Créer l'accord d'entreprise CET (ou appliquer l'accord de branche du 27/03/2000)
+2. Proposer le CET avec rendement attractif (5-8% comme Randstad)
+3. Gain = spread trésorerie (~8 K€) + fidélisation + attractivité
+4. Coût = faible (gestion interne, pas besoin de PERCOL)
+
+### Phase 2 — Après rescrit URSSAF
+5. Déposer le rescrit sur deux questions :
+   - Les 10 jours exonérés au transfert CET→PERCOL incluent-ils les IFM converties en jours-équivalent ?
+   - Le forfait social s'applique-t-il sur ces 10 jours exonérés ?
+6. Si favorable → mettre en place le PERCOL + passerelle CET→PERCOL
+7. Gain additionnel = 30-84 K€/an selon la réponse sur le forfait social
+
+### Ce qu'il NE FAUT PAS faire
+- Ne PAS engager les coûts PERCOL (~50 K€) avant le rescrit
+- Ne PAS promettre de gains RGDU (Étage 1 = 0 confirmé)
+- Ne PAS confondre les deux plafonds de 10 jours (entrée ICCP vs sortie PERCOL)
+
+---
+
+*Sources primaires : Accord de branche 27/03/2000 (signé CFDT, CFTC, CFE-CGC, SNSETT-CGT, CGT-FO, SETT), Dépêche Prism'emploi N°22 (25/04/2023), Note juridique Prism'emploi (02/06/2025), BOSS allègements généraux n°985, Courrier DSS 14/11/2012, Cass. soc. 22/10/2020.*
