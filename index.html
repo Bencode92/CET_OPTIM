@@ -7,9 +7,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
   <script src="https://unpkg.com/htm@3/dist/htm.js"></script>
-  <script src="https://unpkg.com/recharts@2/umd/Recharts.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
@@ -19,29 +18,14 @@
 <body>
   <div id="root"></div>
   <script>
-    // ─── Setup htm ────────────────────────────────────────────────────
     var html = htm.bind(React.createElement);
-    var useState = React.useState;
-    var useMemo = React.useMemo;
-    var useCallback = React.useCallback;
-    var BarChart = Recharts.BarChart;
-    var Bar = Recharts.Bar;
-    var LineChart = Recharts.LineChart;
-    var Line = Recharts.Line;
-    var XAxis = Recharts.XAxis;
-    var YAxis = Recharts.YAxis;
-    var CartesianGrid = Recharts.CartesianGrid;
-    var RTooltip = Recharts.Tooltip;
-    var Legend = Recharts.Legend;
-    var ResponsiveContainer = Recharts.ResponsiveContainer;
-    var ReferenceLine = Recharts.ReferenceLine;
-    var Cell = Recharts.Cell;
+    var useState = React.useState, useMemo = React.useMemo, useCallback = React.useCallback;
+    var useRef = React.useRef, useEffect = React.useEffect;
 
     // ─── RGDU 2026 Parameters ─────────────────────────────────────────
-    var RGDU = { smicHoraire: 12.02, seuil: 3, tMin: 0.02, tMax: 0.4013, tDelta: 0.3813, puissance: 1.75 };
+    var RGDU = { smicHoraire:12.02, seuil:3, tMin:0.02, tMax:0.4013, tDelta:0.3813, puissance:1.75 };
     var COTIS_PATRONALES_RATE = 0.48;
-    var COLORS = ['#2563eb','#16a34a','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
-    var TAB_NAMES = ['Upload','Simulation','Graphiques','Synth\u00e8se','PERCOL'];
+    var TAB_NAMES = ['Upload','Simulation','Graphiques','\u0053ynth\u00e8se','PERCOL'];
 
     // ─── RGDU Calculation ─────────────────────────────────────────────
     function computeRgdu(hrs, brut) {
@@ -53,341 +37,275 @@
       var c = Math.min(RGDU.tMin + RGDU.tDelta * Math.pow(inner, RGDU.puissance), RGDU.tMax);
       return c * brut;
     }
-
     function computeRow(row, pctIfm, pctIccp) {
-      var cetIfm = row.ifm * pctIfm;
-      var cetIccp = row.iccp * pctIccp;
-      var cetTotal = cetIfm + cetIccp;
-      var brutCet = row.brut - cetIfm - cetIccp;
-      var redBase = computeRgdu(row.hrs, row.brut);
-      var redCet = computeRgdu(row.hrs, brutCet);
-      var gain = redCet - redBase;
-      return Object.assign({}, row, { cetIfm:cetIfm, cetIccp:cetIccp, cetTotal:cetTotal, brutCet:brutCet, redBase:redBase, redCet:redCet, gain:gain });
+      var cetIfm = row.ifm * pctIfm, cetIccp = row.iccp * pctIccp;
+      var cetTotal = cetIfm + cetIccp, brutCet = row.brut - cetIfm - cetIccp;
+      var redBase = computeRgdu(row.hrs, row.brut), redCet = computeRgdu(row.hrs, brutCet);
+      return Object.assign({}, row, {cetIfm:cetIfm, cetIccp:cetIccp, cetTotal:cetTotal, brutCet:brutCet, redBase:redBase, redCet:redCet, gain:redCet-redBase});
     }
 
     // ─── CSV/XLSX Parser ──────────────────────────────────────────────
-    function parseFileData(arrayBuffer, fileName) {
-      var ext = fileName.split('.').pop().toLowerCase();
-      var rows;
-      if (ext === 'csv') {
-        var text = new TextDecoder('utf-8').decode(arrayBuffer);
-        var wb = XLSX.read(text, { type: 'string' });
-        rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      } else {
-        var wb2 = XLSX.read(arrayBuffer, { type: 'array' });
-        rows = XLSX.utils.sheet_to_json(wb2.Sheets[wb2.SheetNames[0]]);
-      }
-      function detect(cols, patterns) {
-        return cols.find(function(c) { var cl = c.toLowerCase(); return patterns.every(function(p) { return cl.includes(p); }); });
-      }
+    function parseFileData(buf, fileName) {
+      var ext = fileName.split('.').pop().toLowerCase(), rows;
+      if (ext === 'csv') { var t = new TextDecoder('utf-8').decode(buf); var wb = XLSX.read(t,{type:'string'}); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); }
+      else { var wb2 = XLSX.read(buf,{type:'array'}); rows = XLSX.utils.sheet_to_json(wb2.Sheets[wb2.SheetNames[0]]); }
+      function detect(cols,p){return cols.find(function(c){var cl=c.toLowerCase();return p.every(function(x){return cl.includes(x);});});}
       var cols = rows.length > 0 ? Object.keys(rows[0]) : [];
-      var colMap = {
-        hrs: detect(cols,['hrs','paye']) || detect(cols,['heures']),
-        brut: detect(cols,['brut','r\u00e9el']) || detect(cols,['brut','reel']),
-        ifm: detect(cols,['ifm','r\u00e9el']) || detect(cols,['ifm','reel']) || detect(cols,['ifm']),
-        iccp: detect(cols,['iccp','r\u00e9el']) || detect(cols,['iccp','reel']) || detect(cols,['iccp']),
+      var cm = {
+        hrs: detect(cols,['hrs','paye'])||detect(cols,['heures']),
+        brut: detect(cols,['brut','r\u00e9el'])||detect(cols,['brut','reel']),
+        ifm: detect(cols,['ifm','r\u00e9el'])||detect(cols,['ifm','reel'])||detect(cols,['ifm']),
+        iccp: detect(cols,['iccp','r\u00e9el'])||detect(cols,['iccp','reel'])||detect(cols,['iccp']),
         matricule: detect(cols,['matricule']),
-        nom: detect(cols,['nom']) || detect(cols,['salari\u00e9']) || detect(cols,['salarie']),
+        nom: detect(cols,['nom'])||detect(cols,['salari\u00e9']),
         cotPat: detect(cols,['cot','pat']),
-        reduction: detect(cols,['r\u00e9duction']) || detect(cols,['reduction']),
-        marge: cols.find(function(c) { return c.toLowerCase().trim() === 'marge'; }),
+        reduction: detect(cols,['r\u00e9duction'])||detect(cols,['reduction']),
+        marge: cols.find(function(c){return c.toLowerCase().trim()==='marge';})
       };
-      var missing = ['hrs','brut','ifm','iccp'].filter(function(k) { return !colMap[k]; });
-      if (missing.length > 0) throw new Error('Colonnes manquantes : ' + missing.join(', '));
-      return rows.map(function(r) {
-        return {
-          matricule: r[colMap.matricule] || '', nom: r[colMap.nom] || '',
-          hrs: parseFloat(r[colMap.hrs]) || 0, brut: parseFloat(r[colMap.brut]) || 0,
-          ifm: parseFloat(r[colMap.ifm]) || 0, iccp: parseFloat(r[colMap.iccp]) || 0,
-          cotPat: colMap.cotPat ? parseFloat(r[colMap.cotPat]) || 0 : 0,
-          reductionActuelle: colMap.reduction ? parseFloat(r[colMap.reduction]) || 0 : 0,
-          marge: colMap.marge ? parseFloat(r[colMap.marge]) || 0 : 0,
-        };
-      }).filter(function(r) { return r.hrs > 0 && r.ifm > 0; });
+      var missing = ['hrs','brut','ifm','iccp'].filter(function(k){return !cm[k];});
+      if (missing.length) throw new Error('Colonnes manquantes : '+missing.join(', '));
+      return rows.map(function(r){return {
+        matricule:r[cm.matricule]||'', nom:r[cm.nom]||'',
+        hrs:parseFloat(r[cm.hrs])||0, brut:parseFloat(r[cm.brut])||0,
+        ifm:parseFloat(r[cm.ifm])||0, iccp:parseFloat(r[cm.iccp])||0,
+        cotPat:cm.cotPat?parseFloat(r[cm.cotPat])||0:0,
+        reductionActuelle:cm.reduction?parseFloat(r[cm.reduction])||0:0,
+        marge:cm.marge?parseFloat(r[cm.marge])||0:0
+      };}).filter(function(r){return r.hrs>0&&r.ifm>0;});
     }
 
     // ─── Formatters ───────────────────────────────────────────────────
-    function fmtEur(v) { return v != null ? v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '\u2014'; }
-    function fmtEur2(v) { return v != null ? v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2}) : '\u2014'; }
-    function fmtPct(v) { return (v*100).toFixed(0) + ' %'; }
+    function fmtEur(v){return v!=null?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}):'\u2014';}
+    function fmtEur2(v){return v!=null?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2}):'\u2014';}
+    function fmtPct(v){return (v*100).toFixed(0)+' %';}
 
-    // ─── Slider Component ─────────────────────────────────────────────
+    // ─── Chart.js wrapper ─────────────────────────────────────────────
+    function ChartCanvas(props) {
+      var ref = useRef(null), chartRef = useRef(null);
+      useEffect(function() {
+        if (!ref.current) return;
+        if (chartRef.current) chartRef.current.destroy();
+        chartRef.current = new Chart(ref.current, props.config);
+        return function() { if (chartRef.current) chartRef.current.destroy(); };
+      }, [JSON.stringify(props.config)]);
+      return html`<canvas ref=${ref} height=${props.height || 300}></canvas>`;
+    }
+
+    // ─── Slider ───────────────────────────────────────────────────────
     function SliderParam(props) {
-      var min = props.min != null ? props.min : 0;
-      var max = props.max != null ? props.max : 100;
-      var step = props.step != null ? props.step : 1;
-      var unit = props.unit != null ? props.unit : '%';
+      var min=props.min!=null?props.min:0, max=props.max!=null?props.max:100;
+      var step=props.step!=null?props.step:1, unit=props.unit!=null?props.unit:'%';
       return html`<div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-gray-700" title=${props.tooltip || ''}>
-          ${props.label} : <span className="font-bold text-blue-700">${props.value}${unit}</span>
-        </label>
-        <input type="range" min=${min} max=${max} step=${step} value=${props.value}
-          onChange=${function(e){props.onChange(Number(e.target.value));}} className="w-full accent-blue-600" />
-        <div className="flex justify-between text-xs text-gray-400">
-          <span>${min}${unit}</span><span>${max}${unit}</span>
-        </div>
+        <label className="text-sm font-medium text-gray-700">${props.label} : <span className="font-bold text-blue-700">${props.value}${unit}</span></label>
+        <input type="range" min=${min} max=${max} step=${step} value=${props.value} onChange=${function(e){props.onChange(Number(e.target.value));}} className="w-full accent-blue-600" />
+        <div className="flex justify-between text-xs text-gray-400"><span>${min}${unit}</span><span>${max}${unit}</span></div>
       </div>`;
     }
 
     // ─── Main Component ───────────────────────────────────────────────
     function Simulateur() {
-      var _at = useState(0), activeTab = _at[0], setActiveTab = _at[1];
-      var _d = useState([]), data = _d[0], setData = _d[1];
-      var _fn = useState(''), fileName = _fn[0], setFileName = _fn[1];
-      var _er = useState(''), error = _er[0], setError = _er[1];
-      var _pi = useState(30), pctIfm = _pi[0], setPctIfm = _pi[1];
-      var _pc = useState(30), pctIccp = _pc[0], setPctIccp = _pc[1];
-      var _ef = useState(660), effectifTotal = _ef[0], setEffectifTotal = _ef[1];
-      var _fs = useState(16), forfaitSocial = _fs[0], setForfaitSocial = _fs[1];
-      var _rc = useState(3), rendementCet = _rc[0], setRendementCet = _rc[1];
-      var _ta = useState(30), tauxAdhesion = _ta[0], setTauxAdhesion = _ta[1];
+      var _at=useState(0),activeTab=_at[0],setActiveTab=_at[1];
+      var _d=useState([]),data=_d[0],setData=_d[1];
+      var _fn=useState(''),fileName=_fn[0],setFileName=_fn[1];
+      var _er=useState(''),error=_er[0],setError=_er[1];
+      var _pi=useState(30),pctIfm=_pi[0],setPctIfm=_pi[1];
+      var _pc=useState(30),pctIccp=_pc[0],setPctIccp=_pc[1];
+      var _ef=useState(660),effectifTotal=_ef[0],setEffectifTotal=_ef[1];
+      var _fs=useState(16),forfaitSocial=_fs[0],setForfaitSocial=_fs[1];
+      var _rc=useState(3),rendementCet=_rc[0],setRendementCet=_rc[1];
+      var _ta=useState(30),tauxAdhesion=_ta[0],setTauxAdhesion=_ta[1];
 
       var handleFile = useCallback(function(e) {
-        var file = e.target.files && e.target.files[0];
-        if (!file) return;
+        var file = e.target.files && e.target.files[0]; if (!file) return;
         setError('');
         file.arrayBuffer().then(function(buf) {
-          try {
-            var parsed = parseFileData(buf, file.name);
-            setData(parsed);
-            setFileName(file.name);
-            setActiveTab(1);
-          } catch(err) { setError(err.message); }
+          try { var p=parseFileData(buf,file.name); setData(p); setFileName(file.name); setActiveTab(1); }
+          catch(err) { setError(err.message); }
         });
       }, []);
 
-      var simulated = useMemo(function() {
-        return data.map(function(r) { return computeRow(r, pctIfm/100, pctIccp/100); });
-      }, [data, pctIfm, pctIccp]);
+      var simulated = useMemo(function(){return data.map(function(r){return computeRow(r,pctIfm/100,pctIccp/100);});}, [data,pctIfm,pctIccp]);
 
       var totals = useMemo(function() {
-        var t = {n:simulated.length, hrs:0, brut:0, ifm:0, iccp:0, cetTotal:0, redBase:0, redCet:0, gain:0, cotPat:0, reductionActuelle:0, marge:0};
-        simulated.forEach(function(r) {
-          t.hrs+=r.hrs; t.brut+=r.brut; t.ifm+=r.ifm; t.iccp+=r.iccp;
-          t.cetTotal+=r.cetTotal; t.redBase+=r.redBase; t.redCet+=r.redCet;
-          t.gain+=r.gain; t.cotPat+=r.cotPat; t.reductionActuelle+=r.reductionActuelle; t.marge+=r.marge;
-        });
+        var t={n:simulated.length,hrs:0,brut:0,ifm:0,iccp:0,cetTotal:0,redBase:0,redCet:0,gain:0,cotPat:0,reductionActuelle:0,marge:0};
+        simulated.forEach(function(r){t.hrs+=r.hrs;t.brut+=r.brut;t.ifm+=r.ifm;t.iccp+=r.iccp;t.cetTotal+=r.cetTotal;t.redBase+=r.redBase;t.redCet+=r.redCet;t.gain+=r.gain;t.cotPat+=r.cotPat;t.reductionActuelle+=r.reductionActuelle;t.marge+=r.marge;});
         return t;
       }, [simulated]);
 
-      var extrapolationFactor = totals.n > 0 ? effectifTotal / totals.n : 1;
-      var gainAnnuel = totals.gain * 12;
-      var gainExtrapole = gainAnnuel * extrapolationFactor;
+      var xf = totals.n>0?effectifTotal/totals.n:1;
+      var gainAnnuel = totals.gain*12, gainExtrapole = gainAnnuel*xf;
 
-      var scenarioData = useMemo(function() {
-        return [0,10,20,30,50,100].map(function(pct) {
-          var rows = data.map(function(r) { return computeRow(r, pct/100, pct/100); });
-          var totalGain = rows.reduce(function(s,r) { return s+r.gain; }, 0);
-          var totalCet = rows.reduce(function(s,r) { return s+r.cetTotal; }, 0);
-          return { name: pct+'%', gainMensuel: totalGain, gainAnnuel: totalGain*12, gainExtrapole: totalGain*12*extrapolationFactor, cetMensuel: totalCet };
+      var scenarioData = useMemo(function(){
+        return [0,10,20,30,50,100].map(function(pct){
+          var rows=data.map(function(r){return computeRow(r,pct/100,pct/100);});
+          var g=rows.reduce(function(s,r){return s+r.gain;},0);
+          return {name:pct+'%',gainMensuel:g,gainAnnuel:g*12,gainExtrapole:g*12*xf};
         });
-      }, [data, extrapolationFactor]);
+      },[data,xf]);
 
-      var percolData = useMemo(function() {
-        var cetMensuelMoyen = totals.n > 0 ? totals.cetTotal / totals.n : 0;
-        var cetAnnuelParSalarie = cetMensuelMoyen * 12;
-        var rendement = cetAnnuelParSalarie * (rendementCet / 100);
-        var principalPlusRendement = cetAnnuelParSalarie + rendement;
-        var cashCotis = cetAnnuelParSalarie * COTIS_PATRONALES_RATE;
-        var coutCashDirect = cashCotis;
-        var cetCashCotis = cetAnnuelParSalarie * COTIS_PATRONALES_RATE;
-        var coutCetCash = cetCashCotis + rendement;
-        var fs = forfaitSocial / 100;
-        var forfaitAmount = principalPlusRendement * fs;
-        var coutCetPercol = forfaitAmount + rendement;
-        var econVsCash = coutCashDirect - coutCetPercol;
-        var nbAdherents = Math.round(effectifTotal * (tauxAdhesion / 100));
-        var econTotale = econVsCash * nbAdherents;
-        var adhesionScenarios = [20,30,50,70,100].map(function(taux) {
-          var nb = Math.round(effectifTotal * (taux / 100));
-          return { taux: taux+'%', nbAdherents: nb, econAnnuelle: econVsCash * nb };
-        });
+      var percolData = useMemo(function(){
+        var avg=totals.n>0?totals.cetTotal/totals.n:0, ann=avg*12;
+        var rend=ann*(rendementCet/100), tot=ann+rend;
+        var cashCotis=ann*COTIS_PATRONALES_RATE;
+        var cetCashCost=cashCotis+rend;
+        var fs=forfaitSocial/100, fAmt=tot*fs, cetPercolCost=fAmt+rend;
+        var econ=cashCotis-cetPercolCost;
+        var nbAdh=Math.round(effectifTotal*(tauxAdhesion/100));
+        var adhScens=[20,30,50,70,100].map(function(t){var nb=Math.round(effectifTotal*(t/100));return{taux:t+'%',nb:nb,econ:econ*nb};});
         return {
-          cetMensuelMoyen: cetMensuelMoyen, cetAnnuelParSalarie: cetAnnuelParSalarie,
-          rendement: rendement, principalPlusRendement: principalPlusRendement,
-          scenarios: [
-            { name:'Cash direct', principal:cetAnnuelParSalarie, rendementVerse:0, cotisations:cashCotis, forfait:0, coutEmployeur:coutCashDirect, econVsCash:0 },
-            { name:'CET \u2192 Cash', principal:cetAnnuelParSalarie, rendementVerse:rendement, cotisations:cetCashCotis, forfait:0, coutEmployeur:coutCetCash, econVsCash:coutCashDirect-coutCetCash },
-            { name:'CET \u2192 PERCOL', principal:cetAnnuelParSalarie, rendementVerse:rendement, cotisations:0, forfait:forfaitAmount, coutEmployeur:coutCetPercol, econVsCash:econVsCash },
+          avg:avg, ann:ann, rend:rend,
+          scenarios:[
+            {name:'Cash direct',principal:ann,rendVerse:0,cotis:cashCotis,forfait:0,cout:cashCotis,econ:0},
+            {name:'CET \u2192 Cash',principal:ann,rendVerse:rend,cotis:cashCotis,forfait:0,cout:cetCashCost,econ:cashCotis-cetCashCost},
+            {name:'CET \u2192 PERCOL',principal:ann,rendVerse:rend,cotis:0,forfait:fAmt,cout:cetPercolCost,econ:econ}
           ],
-          nbAdherents: nbAdherents, econTotale: econTotale, adhesionScenarios: adhesionScenarios
+          nbAdh:nbAdh, econTotale:econ*nbAdh, adhScens:adhScens
         };
-      }, [totals, rendementCet, forfaitSocial, effectifTotal, tauxAdhesion]);
+      },[totals,rendementCet,forfaitSocial,effectifTotal,tauxAdhesion]);
+
+      var hasData = data.length>0;
+
+      // ═══ Chart configs ══════════════════════════════════════════════
+      var barScenarioConfig = useMemo(function(){
+        return {type:'bar',data:{labels:scenarioData.map(function(s){return s.name;}),datasets:[
+          {label:'Gain annuel (fichier)',data:scenarioData.map(function(s){return s.gainAnnuel;}),backgroundColor:'#2563eb',borderRadius:4},
+          {label:'Gain extrapol\u00e9 ('+effectifTotal+' sal.)',data:scenarioData.map(function(s){return s.gainExtrapole;}),backgroundColor:'#16a34a',borderRadius:4}
+        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+' : '+fmtEur(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k\u20ac';}}}}}};
+      },[scenarioData,effectifTotal]);
+
+      var lineGainConfig = useMemo(function(){
+        return {type:'line',data:{labels:scenarioData.map(function(s){return s.name;}),datasets:[
+          {label:'Gain mensuel',data:scenarioData.map(function(s){return s.gainMensuel;}),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,0.1)',fill:true,tension:0.3,pointRadius:5}
+        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return fmtEur2(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return v.toFixed(0)+'\u20ac';}}}}}};
+      },[scenarioData]);
+
+      var distConfig = useMemo(function(){
+        return {type:'bar',data:{labels:simulated.map(function(_,i){return i+1;}),datasets:[
+          {label:'Gain RGDU',data:simulated.map(function(r){return r.gain;}),backgroundColor:'#16a34a',borderRadius:2}
+        ]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return fmtEur2(ctx.parsed.y);}}}},scales:{x:{title:{display:true,text:'Salari\u00e9'}},y:{ticks:{callback:function(v){return v.toFixed(1)+'\u20ac';}}}}}};
+      },[simulated]);
+
+      var synthBarConfig = useMemo(function(){
+        var sc=[10,30,50].map(function(pct){var rows=data.map(function(r){return computeRow(r,pct/100,pct/100);});var g=rows.reduce(function(s,r){return s+r.gain;},0);return{name:pct+'% CET',val:g*12*xf};});
+        return {type:'bar',data:{labels:sc.map(function(s){return s.name;}),datasets:[
+          {label:'Gain annuel extrapol\u00e9',data:sc.map(function(s){return s.val;}),backgroundColor:['#2563eb','#f59e0b','#16a34a'],borderRadius:4}
+        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return fmtEur(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k\u20ac';}}}}}};
+      },[data,xf]);
+
+      var percolBarConfig = useMemo(function(){
+        return {type:'bar',data:{labels:percolData.scenarios.map(function(s){return s.name;}),datasets:[
+          {label:'Cotisations patronales',data:percolData.scenarios.map(function(s){return s.cotis;}),backgroundColor:'#ef4444'},
+          {label:'Forfait social',data:percolData.scenarios.map(function(s){return s.forfait;}),backgroundColor:'#f59e0b'},
+          {label:'Rendement vers\u00e9',data:percolData.scenarios.map(function(s){return s.rendVerse;}),backgroundColor:'#3b82f6'}
+        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+' : '+fmtEur(ctx.parsed.y);}}}},scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:function(v){return v.toFixed(0)+'\u20ac';}}}}}};
+      },[percolData]);
+
+      var adhBarConfig = useMemo(function(){
+        var colors=['#2563eb','#16a34a','#f59e0b','#ef4444','#8b5cf6'];
+        return {type:'bar',data:{labels:percolData.adhScens.map(function(s){return s.taux;}),datasets:[
+          {label:'\u00c9conomie annuelle',data:percolData.adhScens.map(function(s){return s.econ;}),backgroundColor:colors,borderRadius:4}
+        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return fmtEur(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k\u20ac';}}}}}};
+      },[percolData]);
 
       // ═══════════════════════════════════════════════════════════════
-      //  RENDER
-      // ═══════════════════════════════════════════════════════════════
-      var hasData = data.length > 0;
-
       return html`<div className="min-h-screen bg-gray-50 p-4 md:p-8">
         <header className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Simulateur CET \u00d7 RGDU 2026</h1>
-          <p className="text-sm text-gray-500">
-            Optimisation charges patronales int\u00e9rim \u2014 Sch\u00e9ma 3 \u00e9tages
+          <p className="text-sm text-gray-500">Optimisation charges patronales int\u00e9rim \u2014 Sch\u00e9ma 3 \u00e9tages
             ${fileName && html`<span className="ml-2 text-blue-600">(${fileName} \u2014 ${data.length} lignes)</span>`}
           </p>
         </header>
 
-        <!-- Tabs -->
         <nav className="flex gap-1 mb-6 border-b border-gray-200">
-          ${TAB_NAMES.map(function(name, i) {
-            var active = activeTab === i;
-            var disabled = i > 0 && !hasData;
-            return html`<button key=${name}
-              onClick=${function(){if(!disabled) setActiveTab(i);}}
-              className=${"px-4 py-2 text-sm font-medium rounded-t transition-colors cursor-pointer "
-                + (active ? 'bg-white border border-b-0 border-gray-200 text-blue-700 ' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 ')
-                + (disabled ? 'opacity-40 cursor-not-allowed' : '')}
+          ${TAB_NAMES.map(function(name,i){
+            var dis=i>0&&!hasData;
+            return html`<button key=${name} onClick=${function(){if(!dis)setActiveTab(i);}}
+              className=${"px-4 py-2 text-sm font-medium rounded-t transition-colors "+(activeTab===i?'bg-white border border-b-0 border-gray-200 text-blue-700 ':'text-gray-500 hover:text-gray-700 hover:bg-gray-100 ')+(dis?'opacity-40 cursor-not-allowed':'cursor-pointer')}
             >${name}</button>`;
           })}
         </nav>
 
         ${error && html`<div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">${error}</div>`}
 
-        <!-- TAB 0 : Upload -->
-        ${activeTab === 0 && html`<section className="max-w-xl mx-auto">
+        ${activeTab===0 && html`<section className="max-w-xl mx-auto">
           <div className="bg-white rounded-xl shadow p-8 text-center">
             <div className="mb-4 text-5xl text-gray-300">\ud83d\udcc4</div>
             <h2 className="text-lg font-semibold mb-2">Charger un fichier Marges</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Formats accept\u00e9s : CSV ou XLSX.<br/>Colonnes requises : Hrs Paye, Brut r\u00e9el, IFM r\u00e9elles, ICCP r\u00e9elles.
-            </p>
+            <p className="text-sm text-gray-500 mb-6">CSV ou XLSX. Colonnes : Hrs Paye, Brut r\u00e9el, IFM r\u00e9elles, ICCP r\u00e9elles.</p>
             <label className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-lg cursor-pointer hover:bg-blue-700 transition">
-              S\u00e9lectionner un fichier
-              <input type="file" accept=".csv,.xlsx,.xls" onChange=${handleFile} className="hidden" />
+              S\u00e9lectionner un fichier<input type="file" accept=".csv,.xlsx,.xls" onChange=${handleFile} className="hidden" />
             </label>
-            ${fileName && html`<p className="mt-4 text-green-600 text-sm font-medium">\u2713 ${fileName} charg\u00e9 (${data.length} salari\u00e9s)</p>`}
+            ${fileName && html`<p className="mt-4 text-green-600 text-sm font-medium">\u2713 ${fileName} (${data.length} salari\u00e9s)</p>`}
           </div>
           <div className="mt-6 bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold mb-3 text-sm">Param\u00e8tres RGDU 2026</h3>
             <table className="w-full text-sm"><tbody>
-              ${[
-                ['SMIC horaire', RGDU.smicHoraire+' \u20ac'],
-                ["Seuil d'extinction", RGDU.seuil+' \u00d7 SMIC'],
-                ['Tmin', fmtPct(RGDU.tMin)],
-                ['Tmax', fmtPct(RGDU.tMax)],
-                ['T\u03b4', fmtPct(RGDU.tDelta)],
-                ['Puissance', ''+RGDU.puissance],
-              ].map(function(kv) {
-                return html`<tr key=${kv[0]} className="border-b border-gray-100">
-                  <td className="py-1 text-gray-600">${kv[0]}</td>
-                  <td className="py-1 font-mono text-right">${kv[1]}</td>
-                </tr>`;
+              ${[['SMIC horaire',RGDU.smicHoraire+' \u20ac'],["Seuil d'extinction",RGDU.seuil+' \u00d7 SMIC'],['Tmin',fmtPct(RGDU.tMin)],['Tmax',fmtPct(RGDU.tMax)],['T\u03b4',fmtPct(RGDU.tDelta)],['Puissance',''+RGDU.puissance]].map(function(kv){
+                return html`<tr key=${kv[0]} className="border-b border-gray-100"><td className="py-1 text-gray-600">${kv[0]}</td><td className="py-1 font-mono text-right">${kv[1]}</td></tr>`;
               })}
             </tbody></table>
           </div>
         </section>`}
 
-        <!-- TAB 1 : Simulation -->
-        ${activeTab === 1 && hasData && html`<section>
+        ${activeTab===1 && hasData && html`<section>
           <div className="bg-white rounded-xl shadow p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
             <${SliderParam} label="% IFM vers CET" value=${pctIfm} onChange=${setPctIfm} />
             <${SliderParam} label="% ICCP vers CET" value=${pctIccp} onChange=${setPctIccp} />
             <${SliderParam} label="Effectif total" value=${effectifTotal} onChange=${setEffectifTotal} min=${1} max=${5000} step=${10} unit="" />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            ${[
-              ['CET mensuel total', fmtEur(totals.cetTotal), 'bg-blue-50 text-blue-800'],
-              ['Gain RGDU mensuel', fmtEur2(totals.gain), 'bg-green-50 text-green-800'],
-              ['Gain annuel (fichier)', fmtEur(gainAnnuel), 'bg-green-50 text-green-800'],
-              ['Gain annuel extrapol\u00e9', fmtEur(gainExtrapole), 'bg-amber-50 text-amber-800'],
-            ].map(function(c) {
-              return html`<div key=${c[0]} className=${"rounded-xl p-4 "+c[2]}>
-                <div className="text-xs font-medium opacity-70">${c[0]}</div>
-                <div className="text-xl font-bold mt-1">${c[1]}</div>
-              </div>`;
+            ${[['CET mensuel total',fmtEur(totals.cetTotal),'bg-blue-50 text-blue-800'],['Gain RGDU mensuel',fmtEur2(totals.gain),'bg-green-50 text-green-800'],['Gain annuel (fichier)',fmtEur(gainAnnuel),'bg-green-50 text-green-800'],['Gain annuel extrapol\u00e9',fmtEur(gainExtrapole),'bg-amber-50 text-amber-800']].map(function(c){
+              return html`<div key=${c[0]} className=${"rounded-xl p-4 "+c[2]}><div className="text-xs font-medium opacity-70">${c[0]}</div><div className="text-xl font-bold mt-1">${c[1]}</div></div>`;
             })}
           </div>
           <div className="bg-white rounded-xl shadow overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr className="bg-gray-800 text-white">
-                ${['#','Matricule','Hrs','Brut r\u00e9el','IFM','ICCP','CET IFM','CET ICCP','CET Total','Brut CET','R\u00e9d. base','R\u00e9d. CET','Gain'].map(function(h) {
-                  return html`<th key=${h} className="px-2 py-2 text-left font-medium">${h}</th>`;
-                })}
+                ${['#','Matricule','Hrs','Brut r\u00e9el','IFM','ICCP','CET IFM','CET ICCP','CET Total','Brut CET','R\u00e9d. base','R\u00e9d. CET','Gain'].map(function(h){return html`<th key=${h} className="px-2 py-2 text-left font-medium">${h}</th>`;})}
               </tr></thead>
               <tbody>
-                ${simulated.slice(0,50).map(function(r,i) {
-                  return html`<tr key=${i} className=${i%2===0?'bg-gray-50':'bg-white'}>
-                    <td className="px-2 py-1 text-gray-400">${i+1}</td>
-                    <td className="px-2 py-1 font-mono">${r.matricule}</td>
-                    <td className="px-2 py-1 text-right">${r.hrs}</td>
-                    <td className="px-2 py-1 text-right">${fmtEur2(r.brut)}</td>
-                    <td className="px-2 py-1 text-right">${fmtEur2(r.ifm)}</td>
-                    <td className="px-2 py-1 text-right">${fmtEur2(r.iccp)}</td>
-                    <td className="px-2 py-1 text-right text-blue-600">${fmtEur2(r.cetIfm)}</td>
-                    <td className="px-2 py-1 text-right text-blue-600">${fmtEur2(r.cetIccp)}</td>
-                    <td className="px-2 py-1 text-right font-medium text-blue-700">${fmtEur2(r.cetTotal)}</td>
-                    <td className="px-2 py-1 text-right">${fmtEur2(r.brutCet)}</td>
-                    <td className="px-2 py-1 text-right">${fmtEur2(r.redBase)}</td>
-                    <td className="px-2 py-1 text-right">${fmtEur2(r.redCet)}</td>
-                    <td className="px-2 py-1 text-right font-bold text-green-700">${fmtEur2(r.gain)}</td>
-                  </tr>`;
-                })}
+                ${simulated.slice(0,50).map(function(r,i){return html`<tr key=${i} className=${i%2===0?'bg-gray-50':'bg-white'}>
+                  <td className="px-2 py-1 text-gray-400">${i+1}</td><td className="px-2 py-1 font-mono">${r.matricule}</td>
+                  <td className="px-2 py-1 text-right">${r.hrs}</td><td className="px-2 py-1 text-right">${fmtEur2(r.brut)}</td>
+                  <td className="px-2 py-1 text-right">${fmtEur2(r.ifm)}</td><td className="px-2 py-1 text-right">${fmtEur2(r.iccp)}</td>
+                  <td className="px-2 py-1 text-right text-blue-600">${fmtEur2(r.cetIfm)}</td><td className="px-2 py-1 text-right text-blue-600">${fmtEur2(r.cetIccp)}</td>
+                  <td className="px-2 py-1 text-right font-medium text-blue-700">${fmtEur2(r.cetTotal)}</td><td className="px-2 py-1 text-right">${fmtEur2(r.brutCet)}</td>
+                  <td className="px-2 py-1 text-right">${fmtEur2(r.redBase)}</td><td className="px-2 py-1 text-right">${fmtEur2(r.redCet)}</td>
+                  <td className="px-2 py-1 text-right font-bold text-green-700">${fmtEur2(r.gain)}</td>
+                </tr>`;})}
                 <tr className="bg-gray-800 text-white font-medium">
                   <td className="px-2 py-2" colSpan=${2}>TOTAUX (${totals.n})</td>
-                  <td className="px-2 py-2 text-right">${totals.hrs.toFixed(0)}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.brut)}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.ifm)}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.iccp)}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.cetTotal * pctIfm / ((pctIfm+pctIccp)||1))}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.cetTotal * pctIccp / ((pctIfm+pctIccp)||1))}</td>
+                  <td className="px-2 py-2 text-right">${totals.hrs.toFixed(0)}</td><td className="px-2 py-2 text-right">${fmtEur(totals.brut)}</td>
+                  <td className="px-2 py-2 text-right">${fmtEur(totals.ifm)}</td><td className="px-2 py-2 text-right">${fmtEur(totals.iccp)}</td>
+                  <td className="px-2 py-2 text-right">${fmtEur(totals.cetTotal*pctIfm/((pctIfm+pctIccp)||1))}</td>
+                  <td className="px-2 py-2 text-right">${fmtEur(totals.cetTotal*pctIccp/((pctIfm+pctIccp)||1))}</td>
                   <td className="px-2 py-2 text-right text-blue-300">${fmtEur(totals.cetTotal)}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.brut - totals.cetTotal)}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.redBase)}</td>
-                  <td className="px-2 py-2 text-right">${fmtEur(totals.redCet)}</td>
+                  <td className="px-2 py-2 text-right">${fmtEur(totals.brut-totals.cetTotal)}</td>
+                  <td className="px-2 py-2 text-right">${fmtEur(totals.redBase)}</td><td className="px-2 py-2 text-right">${fmtEur(totals.redCet)}</td>
                   <td className="px-2 py-2 text-right text-green-300">${fmtEur2(totals.gain)}</td>
                 </tr>
               </tbody>
             </table>
-            ${simulated.length > 50 && html`<p className="text-xs text-gray-400 p-2 text-center">Affichage limit\u00e9 aux 50 premi\u00e8res lignes sur ${simulated.length}</p>`}
+            ${simulated.length>50 && html`<p className="text-xs text-gray-400 p-2 text-center">Affichage limit\u00e9 aux 50 premi\u00e8res lignes sur ${simulated.length}</p>`}
           </div>
         </section>`}
 
-        <!-- TAB 2 : Graphiques -->
-        ${activeTab === 2 && hasData && html`<section className="space-y-8">
+        ${activeTab===2 && hasData && html`<section className="space-y-8">
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold mb-4">Gain RGDU annuel par sc\u00e9nario CET</h3>
-            <${ResponsiveContainer} width="100%" height=${350}>
-              <${BarChart} data=${scenarioData}>
-                <${CartesianGrid} strokeDasharray="3 3" />
-                <${XAxis} dataKey="name" />
-                <${YAxis} tickFormatter=${function(v){return (v/1000).toFixed(0)+'k\u20ac';}} />
-                <${RTooltip} formatter=${function(v){return fmtEur(v);}} />
-                <${Legend} />
-                <${Bar} dataKey="gainAnnuel" name="Gain annuel (fichier)" fill="#2563eb" radius=${[4,4,0,0]} />
-                <${Bar} dataKey="gainExtrapole" name=${'Gain extrapol\u00e9 ('+effectifTotal+' sal.)'} fill="#16a34a" radius=${[4,4,0,0]} />
-              <//>
-            <//>
+            <${ChartCanvas} config=${barScenarioConfig} height=${350} />
           </div>
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold mb-4">Courbe du gain RGDU mensuel</h3>
-            <${ResponsiveContainer} width="100%" height=${300}>
-              <${LineChart} data=${scenarioData}>
-                <${CartesianGrid} strokeDasharray="3 3" />
-                <${XAxis} dataKey="name" />
-                <${YAxis} tickFormatter=${function(v){return v.toFixed(0)+'\u20ac';}} />
-                <${RTooltip} formatter=${function(v){return fmtEur2(v);}} />
-                <${Line} type="monotone" dataKey="gainMensuel" name="Gain mensuel" stroke="#2563eb" strokeWidth=${2} dot=${{r:5}} />
-                <${ReferenceLine} y=${0} stroke="#666" strokeDasharray="3 3" />
-              <//>
-            <//>
+            <${ChartCanvas} config=${lineGainConfig} height=${300} />
           </div>
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold mb-4">Distribution du gain par salari\u00e9 (mensuel)</h3>
-            <${ResponsiveContainer} width="100%" height=${300}>
-              <${BarChart} data=${simulated.map(function(r,i){return {idx:i+1, gain:r.gain};})}>
-                <${CartesianGrid} strokeDasharray="3 3" />
-                <${XAxis} dataKey="idx" />
-                <${YAxis} tickFormatter=${function(v){return v.toFixed(1)+'\u20ac';}} />
-                <${RTooltip} formatter=${function(v){return fmtEur2(v);}} />
-                <${Bar} dataKey="gain" name="Gain RGDU" fill="#16a34a" radius=${[2,2,0,0]} />
-              <//>
-            <//>
+            <${ChartCanvas} config=${distConfig} height=${300} />
           </div>
         </section>`}
 
-        <!-- TAB 3 : Synthèse -->
-        ${activeTab === 3 && hasData && html`<section className="space-y-6">
+        ${activeTab===3 && hasData && html`<section className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold mb-4 text-lg">Synth\u00e8se \u2014 Projection 3 sc\u00e9narios CET</h3>
             <table className="w-full text-sm">
@@ -398,210 +316,100 @@
                 <th className="py-2 text-right text-green-600">Ambitieux (50%)</th>
               </tr></thead>
               <tbody>
-                ${(function() {
-                  var scens = [10,30,50].map(function(pct) {
-                    var rows = data.map(function(r) { return computeRow(r, pct/100, pct/100); });
-                    var g = rows.reduce(function(s,r){return s+r.gain;},0);
-                    var cet = rows.reduce(function(s,r){return s+r.cetTotal;},0);
-                    return {pct:pct, gainMensuel:g, gainAnnuel:g*12, gainExtrapole:g*12*extrapolationFactor, cetMensuel:cet, cetAnnuel:cet*12, gainMoyenParSalarie:g/(rows.length||1)};
-                  });
-                  return [
-                    ['CET mensuel (fichier)', function(s){return fmtEur(s.cetMensuel);}],
-                    ['CET annuel (fichier)', function(s){return fmtEur(s.cetAnnuel);}],
-                    ['Gain RGDU mensuel', function(s){return fmtEur2(s.gainMensuel);}],
-                    ['Gain RGDU annuel (fichier)', function(s){return fmtEur(s.gainAnnuel);}],
-                    ['Gain RGDU annuel extrapol\u00e9', function(s){return fmtEur(s.gainExtrapole);}],
-                    ['Gain moyen / salari\u00e9 / mois', function(s){return fmtEur2(s.gainMoyenParSalarie);}],
-                  ].map(function(item) {
-                    return html`<tr key=${item[0]} className="border-b border-gray-100">
-                      <td className="py-2 text-gray-600">${item[0]}</td>
-                      ${scens.map(function(s) { return html`<td key=${s.pct} className="py-2 text-right font-mono">${item[1](s)}</td>`; })}
-                    </tr>`;
+                ${(function(){
+                  var sc=[10,30,50].map(function(p){var rows=data.map(function(r){return computeRow(r,p/100,p/100);});var g=rows.reduce(function(s,r){return s+r.gain;},0);var cet=rows.reduce(function(s,r){return s+r.cetTotal;},0);return{p:p,gM:g,gA:g*12,gX:g*12*xf,cM:cet,cA:cet*12,gAvg:g/(rows.length||1)};});
+                  return [['CET mensuel (fichier)',function(s){return fmtEur(s.cM);}],['CET annuel (fichier)',function(s){return fmtEur(s.cA);}],['Gain RGDU mensuel',function(s){return fmtEur2(s.gM);}],['Gain RGDU annuel (fichier)',function(s){return fmtEur(s.gA);}],['Gain RGDU annuel extrapol\u00e9',function(s){return fmtEur(s.gX);}],['Gain moyen / salari\u00e9 / mois',function(s){return fmtEur2(s.gAvg);}]].map(function(item){
+                    return html`<tr key=${item[0]} className="border-b border-gray-100"><td className="py-2 text-gray-600">${item[0]}</td>${sc.map(function(s){return html`<td key=${s.p} className="py-2 text-right font-mono">${item[1](s)}</td>`;})}</tr>`;
                   });
                 })()}
               </tbody>
             </table>
-            <p className="mt-4 text-xs text-gray-400">
-              Extrapolation : \u00d7${extrapolationFactor.toFixed(2)} (fichier ${totals.n} \u2192 effectif ${effectifTotal}).
-              Annualisation \u00d712. Les deltas sont fiables, les montants absolus sont \u00e0 recaler.
-            </p>
+            <p className="mt-4 text-xs text-gray-400">Extrapolation : \u00d7${xf.toFixed(2)} (fichier ${totals.n} \u2192 effectif ${effectifTotal}). Annualisation \u00d712.</p>
           </div>
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold mb-4">Comparaison 3 sc\u00e9narios \u2014 Gain annuel extrapol\u00e9</h3>
-            <${ResponsiveContainer} width="100%" height=${300}>
-              <${BarChart} data=${[10,30,50].map(function(pct) {
-                var rows = data.map(function(r){return computeRow(r,pct/100,pct/100);});
-                var g = rows.reduce(function(s,r){return s+r.gain;},0);
-                return {name:pct+'% CET', gainExtrapole:g*12*extrapolationFactor};
-              })}>
-                <${CartesianGrid} strokeDasharray="3 3" />
-                <${XAxis} dataKey="name" />
-                <${YAxis} tickFormatter=${function(v){return (v/1000).toFixed(0)+'k\u20ac';}} />
-                <${RTooltip} formatter=${function(v){return fmtEur(v);}} />
-                <${Bar} dataKey="gainExtrapole" name="Gain annuel extrapol\u00e9" radius=${[4,4,0,0]}>
-                  ${[0,1,2].map(function(i){return html`<${Cell} key=${i} fill=${['#2563eb','#f59e0b','#16a34a'][i]} />`;})
-                }
-                <//>
-              <//>
-            <//>
+            <${ChartCanvas} config=${synthBarConfig} height=${300} />
           </div>
         </section>`}
 
-        <!-- TAB 4 : PERCOL -->
-        ${activeTab === 4 && hasData && html`<section className="space-y-6">
+        ${activeTab===4 && hasData && html`<section className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
             <${SliderParam} label="% IFM vers CET" value=${pctIfm} onChange=${setPctIfm} />
             <${SliderParam} label="% ICCP vers CET" value=${pctIccp} onChange=${setPctIccp} />
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">
-                Forfait social : <span className="font-bold text-blue-700">${forfaitSocial} %</span>
-              </label>
+              <label className="text-sm font-medium text-gray-700">Forfait social : <span className="font-bold text-blue-700">${forfaitSocial} %</span></label>
               <div className="flex gap-2 mt-1">
-                ${[16,20].map(function(v) {
-                  return html`<button key=${v} onClick=${function(){setForfaitSocial(v);}}
-                    className=${"px-4 py-2 rounded-lg font-medium text-sm transition "
-                      +(forfaitSocial===v?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
-                    ${v}%${v===16?' (pilot\u00e9e)':' (standard)'}
-                  </button>`;
-                })}
+                ${[16,20].map(function(v){return html`<button key=${v} onClick=${function(){setForfaitSocial(v);}} className=${"px-4 py-2 rounded-lg font-medium text-sm transition "+(forfaitSocial===v?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200')}>${v}%${v===16?' (pilot\u00e9e)':' (standard)'}</button>`;})}
               </div>
             </div>
             <${SliderParam} label="Rendement CET" value=${rendementCet} onChange=${setRendementCet} min=${1} max=${8} step=${0.5} />
           </div>
-
           <div className="bg-white rounded-xl shadow p-6">
             <${SliderParam} label="Taux d'adh\u00e9sion PERCOL" value=${tauxAdhesion} onChange=${setTauxAdhesion} min=${10} max=${100} step=${5} />
           </div>
 
-          <!-- Comparison table per employee -->
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4 text-lg">
-              Comparaison par int\u00e9rimaire (CET moyen : ${fmtEur2(percolData.cetMensuelMoyen)}/mois \u2192 ${fmtEur(percolData.cetAnnuelParSalarie)}/an)
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b-2 border-gray-300">
-                  <th className="py-2 text-left"></th>
-                  <th className="py-2 text-right px-3 text-gray-600">Cash direct</th>
-                  <th className="py-2 text-right px-3 text-amber-600">CET \u2192 Cash</th>
-                  <th className="py-2 text-right px-3 text-green-600">CET \u2192 PERCOL</th>
-                </tr></thead>
-                <tbody>
-                  ${[
-                    ['Principal annuel','principal'],
-                    ['Rendement CET vers\u00e9','rendementVerse'],
-                    ['Cotisations patronales ('+(COTIS_PATRONALES_RATE*100).toFixed(0)+'%)','cotisations'],
-                    ['Forfait social ('+forfaitSocial+'%)','forfait'],
-                    ['Co\u00fbt total employeur','coutEmployeur'],
-                    ['\u00c9conomie vs cash','econVsCash'],
-                  ].map(function(item) {
-                    var label = item[0], key = item[1];
-                    return html`<tr key=${label} className=${"border-b border-gray-100 "
-                      +(key==='coutEmployeur'?'font-bold bg-gray-50 ':'')
-                      +(key==='econVsCash'?'font-bold ':'')}>
-                      <td className="py-2 text-gray-600">${label}</td>
-                      ${percolData.scenarios.map(function(s) {
-                        return html`<td key=${s.name} className=${"py-2 text-right px-3 font-mono "
-                          +(key==='econVsCash'&&s[key]>0?'text-green-700 ':'')
-                          +(key==='econVsCash'&&s[key]<0?'text-red-600 ':'')}>
-                          ${fmtEur(s[key])}
-                        </td>`;
-                      })}
-                    </tr>`;
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <h3 className="font-semibold mb-4 text-lg">Comparaison par int\u00e9rimaire (CET moyen : ${fmtEur2(percolData.avg)}/mois \u2192 ${fmtEur(percolData.ann)}/an)</h3>
+            <div className="overflow-x-auto"><table className="w-full text-sm">
+              <thead><tr className="border-b-2 border-gray-300">
+                <th className="py-2 text-left"></th><th className="py-2 text-right px-3 text-gray-600">Cash direct</th>
+                <th className="py-2 text-right px-3 text-amber-600">CET \u2192 Cash</th><th className="py-2 text-right px-3 text-green-600">CET \u2192 PERCOL</th>
+              </tr></thead>
+              <tbody>
+                ${[['Principal annuel','principal'],['Rendement CET vers\u00e9','rendVerse'],['Cotisations patronales (48%)','cotis'],['Forfait social ('+forfaitSocial+'%)','forfait'],['Co\u00fbt total employeur','cout'],['\u00c9conomie vs cash','econ']].map(function(item){
+                  var label=item[0],key=item[1];
+                  return html`<tr key=${label} className=${"border-b border-gray-100 "+(key==='cout'?'font-bold bg-gray-50 ':'')+(key==='econ'?'font-bold ':'')}>
+                    <td className="py-2 text-gray-600">${label}</td>
+                    ${percolData.scenarios.map(function(s){return html`<td key=${s.name} className=${"py-2 text-right px-3 font-mono "+(key==='econ'&&s[key]>0?'text-green-700 ':'')+(key==='econ'&&s[key]<0?'text-red-600 ':'')}>${fmtEur(s[key])}</td>`;})}
+                  </tr>`;
+                })}
+              </tbody>
+            </table></div>
           </div>
 
-          <!-- Extrapolation table -->
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold mb-4 text-lg">Extrapolation \u2014 ${effectifTotal} int\u00e9rimaires</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b-2 border-gray-300">
-                  <th className="py-2 text-left">Taux adh\u00e9sion PERCOL</th>
-                  <th className="py-2 text-right">Nb adh\u00e9rents</th>
-                  <th className="py-2 text-right">\u00c9conomie annuelle</th>
-                </tr></thead>
-                <tbody>
-                  ${percolData.adhesionScenarios.map(function(s) {
-                    return html`<tr key=${s.taux} className=${"border-b border-gray-100 "
-                      +(s.taux===tauxAdhesion+'%'?'bg-blue-50 font-medium':'')}>
-                      <td className="py-2">${s.taux}</td>
-                      <td className="py-2 text-right font-mono">${s.nbAdherents}</td>
-                      <td className="py-2 text-right font-mono text-green-700 font-bold">${fmtEur(s.econAnnuelle)}</td>
-                    </tr>`;
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b-2 border-gray-300">
+                <th className="py-2 text-left">Taux adh\u00e9sion</th><th className="py-2 text-right">Nb</th><th className="py-2 text-right">\u00c9conomie annuelle</th>
+              </tr></thead>
+              <tbody>
+                ${percolData.adhScens.map(function(s){return html`<tr key=${s.taux} className=${"border-b border-gray-100 "+(s.taux===tauxAdhesion+'%'?'bg-blue-50 font-medium':'')}>
+                  <td className="py-2">${s.taux}</td><td className="py-2 text-right font-mono">${s.nb}</td>
+                  <td className="py-2 text-right font-mono text-green-700 font-bold">${fmtEur(s.econ)}</td>
+                </tr>`;})}
+              </tbody>
+            </table>
           </div>
 
-          <!-- PERCOL charts -->
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow p-6">
               <h3 className="font-semibold mb-4">Co\u00fbt employeur par sc\u00e9nario</h3>
-              <${ResponsiveContainer} width="100%" height=${300}>
-                <${BarChart} data=${percolData.scenarios}>
-                  <${CartesianGrid} strokeDasharray="3 3" />
-                  <${XAxis} dataKey="name" />
-                  <${YAxis} tickFormatter=${function(v){return v.toFixed(0)+'\u20ac';}} />
-                  <${RTooltip} formatter=${function(v){return fmtEur(v);}} />
-                  <${Legend} />
-                  <${Bar} dataKey="cotisations" name="Cotisations patronales" stackId="a" fill="#ef4444" />
-                  <${Bar} dataKey="forfait" name="Forfait social" stackId="a" fill="#f59e0b" />
-                  <${Bar} dataKey="rendementVerse" name="Rendement vers\u00e9" stackId="a" fill="#3b82f6" />
-                <//>
-              <//>
+              <${ChartCanvas} config=${percolBarConfig} height=${300} />
             </div>
             <div className="bg-white rounded-xl shadow p-6">
-              <h3 className="font-semibold mb-4">\u00c9conomie annuelle par taux d'adh\u00e9sion</h3>
-              <${ResponsiveContainer} width="100%" height=${300}>
-                <${BarChart} data=${percolData.adhesionScenarios}>
-                  <${CartesianGrid} strokeDasharray="3 3" />
-                  <${XAxis} dataKey="taux" />
-                  <${YAxis} tickFormatter=${function(v){return (v/1000).toFixed(0)+'k\u20ac';}} />
-                  <${RTooltip} formatter=${function(v){return fmtEur(v);}} />
-                  <${Bar} dataKey="econAnnuelle" name="\u00c9conomie annuelle" radius=${[4,4,0,0]}>
-                    ${percolData.adhesionScenarios.map(function(_,i){return html`<${Cell} key=${i} fill=${COLORS[i%COLORS.length]} />`;})}
-                  <//>
-                <//>
-              <//>
+              <h3 className="font-semibold mb-4">\u00c9conomie par taux d'adh\u00e9sion</h3>
+              <${ChartCanvas} config=${adhBarConfig} height=${300} />
             </div>
           </div>
 
-          <!-- Key insight box -->
           <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-            <h3 className="font-bold text-green-800 text-lg mb-2">
-              Levier principal : ${(COTIS_PATRONALES_RATE*100).toFixed(0)}% \u2192 ${forfaitSocial}% = \u00e9conomie de ${((COTIS_PATRONALES_RATE-forfaitSocial/100)*100).toFixed(0)} points
-            </h3>
+            <h3 className="font-bold text-green-800 text-lg mb-2">Levier principal : 48% \u2192 ${forfaitSocial}% = \u00e9conomie de ${(48-forfaitSocial)} points</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-700">${fmtEur(percolData.scenarios[2].econVsCash)}</div>
-                <div className="text-sm text-green-600">\u00e9conomie / int\u00e9rimaire / an</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-700">${percolData.nbAdherents}</div>
-                <div className="text-sm text-green-600">adh\u00e9rents PERCOL (${tauxAdhesion}%)</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-700">${fmtEur(percolData.econTotale)}</div>
-                <div className="text-sm text-green-600">\u00e9conomie annuelle totale</div>
-              </div>
+              <div className="text-center"><div className="text-3xl font-bold text-green-700">${fmtEur(percolData.scenarios[2].econ)}</div><div className="text-sm text-green-600">\u00e9conomie / int\u00e9rimaire / an</div></div>
+              <div className="text-center"><div className="text-3xl font-bold text-green-700">${percolData.nbAdh}</div><div className="text-sm text-green-600">adh\u00e9rents PERCOL (${tauxAdhesion}%)</div></div>
+              <div className="text-center"><div className="text-3xl font-bold text-green-700">${fmtEur(percolData.econTotale)}</div><div className="text-sm text-green-600">\u00e9conomie annuelle totale</div></div>
             </div>
           </div>
         </section>`}
 
-        <!-- Footer -->
         <footer className="mt-8 text-center text-xs text-gray-400">
-          Simulateur CET \u00d7 RGDU 2026 \u2014 Les deltas sont fiables, les montants absolus sont \u00e0 recaler sur bulletin r\u00e9el.
-          <br/>Formule : C = 0,02 + 0,3813 \u00d7 [\u00bd \u00d7 (3\u00d7SMIC\u00d7H/Brut \u2212 1)]^1,75
+          Simulateur CET \u00d7 RGDU 2026 \u2014 Les deltas sont fiables, les montants absolus sont \u00e0 recaler.<br/>
+          C = 0,02 + 0,3813 \u00d7 [\u00bd \u00d7 (3\u00d7SMIC\u00d7H/Brut \u2212 1)]^1,75
         </footer>
       </div>`;
     }
 
-    // ─── Mount ────────────────────────────────────────────────────
     ReactDOM.createRoot(document.getElementById('root')).render(html`<${Simulateur} />`);
   </script>
 </body>
