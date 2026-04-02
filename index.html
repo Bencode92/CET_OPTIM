@@ -338,25 +338,48 @@ function App() {
     const spreadTotal = (rE - rS) * cetAnnuelAjuste;
     const gainTotal = gainRGDU + spreadTotal + gainNetEtage3;
 
-    // Sensibilité : courbes pour graphique
-    const sensData = [1,2,3,4,5,6,7,8].map(rx => {
-      const rr = rx/100;
-      return {rend: rx+'%', ...([30,50,70].reduce((o,adh) => {
-        const pa = adh/100, ca = tot.cet*pa*12, pp = ca*pChoixP, pc = ca*(1-pChoixP);
-        const cpP = (pp+pp*rr)*fs + pp*rr - pp*rE;
-        const cpC = (pc+pc*rr)*COTIS + pc*rr - pc*rE;
-        const eP = pp*COTIS - cpP, sC = cpC - pc*COTIS;
-        const g1 = tot.gain*pa*12, g2 = (rE-rr)*ca, g3 = eP - sC;
-        o['g'+adh] = g1 + g2 + g3;
-        return o;
-      }, {}))};
-    });
+    // Per-worker breakdown (for simplified table)
+    const cetMoyMois = tot.n>0 ? tot.cet/tot.n : 0;
+    const cetMoyAn = cetMoyMois * 12;
+    const perWorker = {
+      cetAn: cetMoyAn,
+      rendVerse: cetMoyAn * rS,
+      gainPlac: cetMoyAn * rE,
+      coutCash: cetMoyAn * COTIS,
+      coutPercol: (cetMoyAn + cetMoyAn*rS) * fs + cetMoyAn*rS - cetMoyAn*rE,
+      econPercol: cetMoyAn * COTIS - ((cetMoyAn + cetMoyAn*rS)*fs + cetMoyAn*rS - cetMoyAn*rE),
+    };
+
+    // Sensibilité par levier (calcul du gain total en variant UN paramètre à la fois)
+    function calcTotal(pa,pp,rr,f) {
+      const ca=tot.cet*pa*12, pP=ca*pp, pC=ca*(1-pp);
+      const cpP=(pP+pP*rr)*f+pP*rr-pP*rE, cpC=(pC+pC*rr)*COTIS+pC*rr-pC*rE;
+      const eP=pP*COTIS-cpP, sC=cpC-pC*COTIS;
+      return tot.gain*pa*12 + (rE-rr)*ca + eP - sC;
+    }
+    const leviers = [
+      {nom:'Adhésion CET', param:'adhCET', vals:[20,30,40,50,60,70,80], unit:'%',
+       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(v/100,pChoixP,rS,fs)}))},
+      {nom:'Choix PERCOL', param:'choixP', vals:[20,30,40,50,60,70,80], unit:'%',
+       data: [20,30,40,50,60,70,80].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,v/100,rS,fs)}))},
+      {nom:'Rendement salarié', param:'rendS', vals:[1,2,3,4,5,6], unit:'%',
+       data: [1,2,3,4,5,6].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,v/100,fs)}))},
+      {nom:'Forfait social', param:'fs', vals:[16,18,20], unit:'%',
+       data: [16,18,20].map(v=>({x:v+'%', gain:calcTotal(pAdhCET,pChoixP,rS,v/100)}))},
+    ];
+    // Impact marginal de chaque levier (variation de +10pp ou +1pp)
+    const impacts = leviers.map(l => {
+      const baseG = gainTotal;
+      const vals = l.data.map(d=>d.gain);
+      const maxG = Math.max(...vals), minG = Math.min(...vals);
+      return {...l, range: maxG - minG, base: baseG};
+    }).sort((a,b)=>b.range-a.range);
 
     return {
       nbAdhCET, nbPercol, nbCash, txEffectif, cetMensuelAjuste, cetAnnuelAjuste,
       poolP, poolC, gainPlacP, rendVerseP, montantTransfP, forfaitPaye, coutPERCOL, coutCashRefP, econPERCOL,
       gainPlacC, rendVerseC, cotisPayeC, coutCETCash, coutCashRefC, surcoutCash,
-      gainNetEtage3, gainRGDU, spreadTotal, gainTotal, sensData,
+      gainNetEtage3, gainRGDU, spreadTotal, gainTotal, perWorker, leviers, impacts,
     };
   }, [tot,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL]);
 
@@ -638,62 +661,89 @@ function App() {
           </div>
         </div>
 
-        {/* ──── 4. FLUX DÉTAILLÉ ───────────────────────────────────── */}
+        {/* ──── 4. COÛT PAR INTÉRIMAIRE ──────────────────────────── */}
         <div style={S.card}>
-          <div style={{fontWeight:600,fontSize:14,color:'#fff',marginBottom:16}}>Détail des flux euro par euro (annuel)</div>
-          <table style={{...S.table,fontSize:13}}>
-            <thead><tr>
-              <th style={S.th}/>
-              <th style={{...S.th,...S.tdR,color:'#94a3b8'}}>Référence<br/><span style={{fontSize:10,fontWeight:400}}>sans CET</span></th>
-              <th style={{...S.th,...S.tdR,color:'#fbbf24'}}>CET → Cash<br/><span style={{fontSize:10,fontWeight:400}}>{percol.nbCash} pers.</span></th>
-              <th style={{...S.th,...S.tdR,color:'#22c55e'}}>CET → PERCOL<br/><span style={{fontSize:10,fontWeight:400}}>{percol.nbPercol} pers.</span></th>
-            </tr></thead>
-            <tbody>
-              {[
-                ['Principal annuel', percol.poolC, percol.poolC, percol.poolP],
-                ['Rendement versé ('+txSalarie+'%)', 0, percol.rendVerseC, percol.rendVerseP],
-                ['Gains placement ETT ('+txEtt+'%)', 0, -percol.gainPlacC, -percol.gainPlacP, 'gain'],
-                ['Cotisations patronales (48%)', percol.coutCashRefC, percol.cotisPayeC, 0],
-                ['Forfait social ('+fSocial+'%)', 0, 0, percol.forfaitPaye],
-              ].map(([label,v1,v2,v3,flag])=>(
-                <tr key={label} style={{borderBottom:'1px solid #1e293b'}}>
-                  <td style={{padding:'6px 0',color:'#94a3b8',fontSize:flag==='gain'?11:13}}>{label}</td>
-                  {[v1,v2,v3].map((v,i)=><td key={i} style={{...S.tdR,padding:'6px 0',fontFamily:'monospace',color:flag==='gain'&&v<0?'#22c55e':'#e2e8f0'}}>{v===0?'—':fmtE(v)}</td>)}
-                </tr>
-              ))}
-              <tr style={{borderTop:'2px solid #334155',background:'#0f172a'}}>
-                <td style={{padding:'10px 0',color:'#fff',fontWeight:700}}>Coût additionnel employeur</td>
-                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#fff'}}>{fmtE(percol.coutCashRefC)}</td>
-                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#fbbf24'}}>{fmtE(percol.coutCETCash)}</td>
-                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#22c55e'}}>{fmtE(percol.coutPERCOL)}</td>
-              </tr>
-              <tr style={{borderTop:'1px solid #334155'}}>
-                <td style={{padding:'10px 0',color:'#fff',fontWeight:700}}>Économie vs référence</td>
-                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',color:'#475569'}}>ref.</td>
-                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#f87171'}}>{fmtE(-percol.surcoutCash)}<br/><span style={{fontSize:10,fontWeight:400}}>surcoût</span></td>
-                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#22c55e'}}>+{fmtE(percol.econPERCOL)}<br/><span style={{fontSize:10,fontWeight:400}}>économie</span></td>
-              </tr>
-            </tbody>
-          </table>
+          <div style={{fontWeight:600,fontSize:14,color:'#fff',marginBottom:4}}>Coût par intérimaire (moyenne annuelle)</div>
+          <div style={{fontSize:11,color:'#64748b',marginBottom:16}}>CET moyen : {fmtE2(percol.perWorker.cetAn/12)}/mois → {fmtE(percol.perWorker.cetAn)}/an</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {/* Cash */}
+            <div style={{background:'#1e1b0f',border:'1px solid #854d0e',borderRadius:12,padding:20}}>
+              <div style={{fontSize:14,fontWeight:700,color:'#fbbf24',marginBottom:12}}>Sortie Cash (48% cotisations)</div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:2}}>
+                <div style={{display:'flex',justifyContent:'space-between'}}><span>Cotisations patronales</span><span style={{color:'#f87171',fontWeight:600}}>{fmtE(percol.perWorker.coutCash)}</span></div>
+                <div style={{display:'flex',justifyContent:'space-between'}}><span>+ Rendement versé ({txSalarie}%)</span><span style={{color:'#fbbf24'}}>{fmtE(percol.perWorker.rendVerse)}</span></div>
+                <div style={{display:'flex',justifyContent:'space-between'}}><span>− Gains placement ({txEtt}%)</span><span style={{color:'#22c55e'}}>−{fmtE(percol.perWorker.gainPlac)}</span></div>
+                <div style={{borderTop:'2px solid #854d0e',paddingTop:8,marginTop:8,display:'flex',justifyContent:'space-between',fontWeight:700}}>
+                  <span style={{color:'#fff'}}>Coût net employeur</span>
+                  <span style={{color:'#fbbf24',fontSize:16}}>{fmtE(percol.perWorker.coutCash + percol.perWorker.rendVerse - percol.perWorker.gainPlac)}</span>
+                </div>
+              </div>
+            </div>
+            {/* PERCOL */}
+            <div style={{background:'#052e16',border:'1px solid #166534',borderRadius:12,padding:20}}>
+              <div style={{fontSize:14,fontWeight:700,color:'#22c55e',marginBottom:12}}>Sortie PERCOL ({fSocial}% forfait social)</div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:2}}>
+                <div style={{display:'flex',justifyContent:'space-between'}}><span>Forfait social sur (principal + rend.)</span><span style={{color:'#fbbf24'}}>{fmtE((percol.perWorker.cetAn + percol.perWorker.rendVerse) * fSocial/100)}</span></div>
+                <div style={{display:'flex',justifyContent:'space-between'}}><span>+ Rendement versé ({txSalarie}%)</span><span style={{color:'#fbbf24'}}>{fmtE(percol.perWorker.rendVerse)}</span></div>
+                <div style={{display:'flex',justifyContent:'space-between'}}><span>− Gains placement ({txEtt}%)</span><span style={{color:'#22c55e'}}>−{fmtE(percol.perWorker.gainPlac)}</span></div>
+                <div style={{borderTop:'2px solid #166534',paddingTop:8,marginTop:8,display:'flex',justifyContent:'space-between',fontWeight:700}}>
+                  <span style={{color:'#fff'}}>Coût net employeur</span>
+                  <span style={{color:'#22c55e',fontSize:16}}>{fmtE(percol.perWorker.coutPercol)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{textAlign:'center',marginTop:16,padding:12,background:'#052e16',borderRadius:8}}>
+            <span style={{color:'#94a3b8'}}>Économie par intérimaire PERCOL : </span>
+            <span style={{color:'#22c55e',fontWeight:700,fontSize:18}}>{fmtE(percol.perWorker.econPercol)}/an</span>
+            <span style={{color:'#64748b',marginLeft:8}}>× {percol.nbPercol} adhérents = </span>
+            <span style={{color:'#22c55e',fontWeight:700,fontSize:18}}>{fmtE(percol.econPERCOL)}</span>
+          </div>
         </div>
 
-        {/* ──── 5. SENSIBILITÉ ─────────────────────────────────────── */}
+        {/* ──── 5. SUR QUEL LEVIER APPUYER ? ───────────────────────── */}
         <div style={S.card}>
-          <div style={{fontWeight:600,color:'#fff',marginBottom:4,fontSize:14}}>Sensibilité au rendement CET</div>
-          <div style={{fontSize:11,color:'#64748b',marginBottom:16}}>Choix PERCOL fixe à {txChoixPERCOL}% — Plus le rendement est élevé, plus le surcoût cash augmente mais plus l'adhésion potentielle est forte</div>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={percol.sensData}><CartesianGrid stroke="#1e293b"/>
-              <XAxis dataKey="rend" stroke="#64748b"/><YAxis stroke="#64748b" tickFormatter={v=>(v/1000).toFixed(0)+'k€'}/>
-              <Tooltip formatter={v=>fmtE(v)} contentStyle={{background:'#1e293b',border:'none',borderRadius:8,color:'#fff'}}/>
-              <Legend/>
-              <Line type="monotone" dataKey="g30" name="Adhésion 30%" stroke="#3b82f6" strokeWidth={2} dot={{r:3}}/>
-              <Line type="monotone" dataKey="g50" name="Adhésion 50%" stroke="#22c55e" strokeWidth={2} dot={{r:3}}/>
-              <Line type="monotone" dataKey="g70" name="Adhésion 70%" stroke="#fbbf24" strokeWidth={2} dot={{r:3}}/>
-              <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3"/>
-            </LineChart>
-          </ResponsiveContainer>
+          <div style={{fontWeight:600,fontSize:14,color:'#fff',marginBottom:4}}>Sur quel levier appuyer ?</div>
+          <div style={{fontSize:11,color:'#64748b',marginBottom:16}}>Impact de chaque paramètre sur le gain total (les autres restent fixes)</div>
+          <div style={{marginBottom:20}}>
+            {percol.impacts.map((l,i) => {
+              const maxRange = percol.impacts[0].range || 1;
+              const pct = (l.range / maxRange) * 100;
+              const colors = ['#22c55e','#3b82f6','#fbbf24','#8b5cf6'];
+              return (
+                <div key={l.nom} style={{marginBottom:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                    <span style={{fontSize:13,color:'#fff',fontWeight:600}}>{i+1}. {l.nom}</span>
+                    <span style={{fontSize:13,color:colors[i],fontWeight:700}}>amplitude : {fmtE(l.range)}</span>
+                  </div>
+                  <div style={{height:24,background:'#0f172a',borderRadius:6,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:pct+'%',background:colors[i],borderRadius:6,transition:'width .3s'}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {percol.leviers.map(l => (
+              <div key={l.nom} style={{background:'#0f172a',borderRadius:8,padding:16}}>
+                <div style={{fontSize:12,fontWeight:600,color:'#fff',marginBottom:8}}>{l.nom}</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={l.data}><CartesianGrid stroke="#1e293b"/>
+                    <XAxis dataKey="x" stroke="#64748b" fontSize={10}/>
+                    <YAxis stroke="#64748b" tickFormatter={v=>(v/1000).toFixed(0)+'k'} fontSize={10}/>
+                    <Tooltip formatter={v=>fmtE(v)} contentStyle={{background:'#1e293b',border:'none',borderRadius:8,color:'#fff'}}/>
+                    <Bar dataKey="gain" radius={[3,3,0,0]}>
+                      {l.data.map((_,j)=><Cell key={j} fill={j===l.data.findIndex(d=>d.gain===Math.max(...l.data.map(dd=>dd.gain)))?'#22c55e':'#334155'}/>)}
+                    </Bar>
+                    <ReferenceLine y={percol.gainTotal} stroke="#22c55e" strokeDasharray="3 3"/>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ))}
+          </div>
         </div>
       </div>}
+
 
       <div style={S.footer}>Simulateur CET × RGDU 2026 — Les deltas sont fiables, les montants absolus sont à recaler.<br/>C = 0,02 + 0,3813 × [½ × (3×SMIC×H/Brut − 1)]^1,75</div>
     </div>
