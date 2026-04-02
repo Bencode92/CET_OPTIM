@@ -1,0 +1,30 @@
+# Data files (confidential)
+data/*.xlsx
+data/*.xls
+data/*.csv
+!data/template_marges.csv
+
+# Output files
+output/
+*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
