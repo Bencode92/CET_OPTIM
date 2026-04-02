@@ -338,16 +338,22 @@ function App() {
     const spreadTotal = (rE - rS) * cetAnnuelAjuste;
     const gainTotal = gainRGDU + spreadTotal + gainNetEtage3;
 
-    // Per-worker breakdown (for simplified table)
+    // Per-worker breakdown (for display cards)
     const cetMoyMois = tot.n>0 ? tot.cet/tot.n : 0;
     const cetMoyAn = cetMoyMois * 12;
+    const rendVerseUnit = cetMoyAn * rS;
+    const gainPlacUnit = cetMoyAn * rE;
+    // Étage 3 : Cash = 48% cotis | PERCOL = forfait social sur (principal + rendement versé)
+    const coutCashUnit = cetMoyAn * COTIS;
+    const coutPercolUnit = (cetMoyAn + rendVerseUnit) * fs; // juste le forfait social
+    // L'économie étage 3 = cotis cash évitées - forfait social payé
+    const econPercolUnit = coutCashUnit - coutPercolUnit;
+    // Spread tréso (étage 2) = séparé
+    const spreadUnit = (rE - rS) * cetMoyAn;
     const perWorker = {
-      cetAn: cetMoyAn,
-      rendVerse: cetMoyAn * rS,
-      gainPlac: cetMoyAn * rE,
-      coutCash: cetMoyAn * COTIS,
-      coutPercol: (cetMoyAn + cetMoyAn*rS) * fs + cetMoyAn*rS - cetMoyAn*rE,
-      econPercol: cetMoyAn * COTIS - ((cetMoyAn + cetMoyAn*rS)*fs + cetMoyAn*rS - cetMoyAn*rE),
+      cetAn: cetMoyAn, rendVerse: rendVerseUnit, gainPlac: gainPlacUnit,
+      coutCash: coutCashUnit, coutPercol: coutPercolUnit,
+      econPercol: econPercolUnit, spreadUnit,
     };
 
     // Sensibilité par levier (calcul du gain total en variant UN paramètre à la fois)
@@ -670,27 +676,25 @@ function App() {
             <div style={{background:'#1e1b0f',border:'1px solid #854d0e',borderRadius:12,padding:20}}>
               <div style={{fontSize:14,fontWeight:700,color:'#fbbf24',marginBottom:12}}>Sortie Cash (48% cotisations)</div>
               <div style={{fontSize:12,color:'#94a3b8',lineHeight:2}}>
-                <div style={{display:'flex',justifyContent:'space-between'}}><span>Cotisations patronales</span><span style={{color:'#f87171',fontWeight:600}}>{fmtE(percol.perWorker.coutCash)}</span></div>
-                <div style={{display:'flex',justifyContent:'space-between'}}><span>+ Rendement versé ({txSalarie}%)</span><span style={{color:'#fbbf24'}}>{fmtE(percol.perWorker.rendVerse)}</span></div>
-                <div style={{display:'flex',justifyContent:'space-between'}}><span>− Gains placement ({txEtt}%)</span><span style={{color:'#22c55e'}}>−{fmtE(percol.perWorker.gainPlac)}</span></div>
+                <div style={{display:'flex',justifyContent:'space-between'}}><span>Cotisations patronales sur principal</span><span style={{color:'#f87171',fontWeight:600}}>{fmtE(percol.perWorker.coutCash)}</span></div>
                 <div style={{borderTop:'2px solid #854d0e',paddingTop:8,marginTop:8,display:'flex',justifyContent:'space-between',fontWeight:700}}>
                   <span style={{color:'#fff'}}>Coût net employeur</span>
-                  <span style={{color:'#fbbf24',fontSize:16}}>{fmtE(percol.perWorker.coutCash + percol.perWorker.rendVerse - percol.perWorker.gainPlac)}</span>
+                  <span style={{color:'#fbbf24',fontSize:16}}>{fmtE(percol.perWorker.coutCash)}</span>
                 </div>
               </div>
+              <div style={{marginTop:10,fontSize:10,color:'#64748b',fontStyle:'italic'}}>Le rendement versé et les gains placement (spread) sont comptés séparément dans l'étage 2.</div>
             </div>
             {/* PERCOL */}
             <div style={{background:'#052e16',border:'1px solid #166534',borderRadius:12,padding:20}}>
               <div style={{fontSize:14,fontWeight:700,color:'#22c55e',marginBottom:12}}>Sortie PERCOL ({fSocial}% forfait social)</div>
               <div style={{fontSize:12,color:'#94a3b8',lineHeight:2}}>
                 <div style={{display:'flex',justifyContent:'space-between'}}><span>Forfait social sur (principal + rend.)</span><span style={{color:'#fbbf24'}}>{fmtE((percol.perWorker.cetAn + percol.perWorker.rendVerse) * fSocial/100)}</span></div>
-                <div style={{display:'flex',justifyContent:'space-between'}}><span>+ Rendement versé ({txSalarie}%)</span><span style={{color:'#fbbf24'}}>{fmtE(percol.perWorker.rendVerse)}</span></div>
-                <div style={{display:'flex',justifyContent:'space-between'}}><span>− Gains placement ({txEtt}%)</span><span style={{color:'#22c55e'}}>−{fmtE(percol.perWorker.gainPlac)}</span></div>
                 <div style={{borderTop:'2px solid #166534',paddingTop:8,marginTop:8,display:'flex',justifyContent:'space-between',fontWeight:700}}>
                   <span style={{color:'#fff'}}>Coût net employeur</span>
-                  <span style={{color:'#22c55e',fontSize:16}}>{fmtE(percol.perWorker.coutPercol)}</span>
+                  <span style={{color:'#22c55e',fontSize:16}}>{fmtE((percol.perWorker.cetAn + percol.perWorker.rendVerse) * fSocial/100)}</span>
                 </div>
               </div>
+              <div style={{marginTop:10,fontSize:10,color:'#64748b',fontStyle:'italic'}}>Le rendement et le placement sont comptés dans l'étage 2 (spread tréso) pendant les 12 mois de détention. Après transfert PERCOL, l'ETT ne détient plus le cash.</div>
             </div>
           </div>
           <div style={{textAlign:'center',marginTop:16,padding:12,background:'#052e16',borderRadius:8}}>
