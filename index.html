@@ -5,277 +5,357 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Simulateur CET × RGDU 2026</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      navy: { 900:'#0a0f1e', 800:'#111827', 700:'#1e293b', 600:'#334155' },
+      accent: { green:'#22c55e', greenDark:'#15803d', blue:'#3b82f6', blueDark:'#1d4ed8' }
+    }}}}
+  </script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/htm@3/dist/htm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
-    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
-    input[type="range"] { height: 6px; }
+    body { margin:0; font-family:system-ui,-apple-system,sans-serif; background:#0a0f1e; color:#e2e8f0; }
+    input[type="range"] { height:6px; }
+    input[type="range"]::-webkit-slider-runnable-track { background:#334155; border-radius:4px; }
+    input[type="range"]::-webkit-slider-thumb { background:#22c55e; }
+    ::-webkit-scrollbar { width:8px; height:8px; }
+    ::-webkit-scrollbar-track { background:#111827; }
+    ::-webkit-scrollbar-thumb { background:#334155; border-radius:4px; }
   </style>
 </head>
 <body>
   <div id="root"></div>
   <script>
-    var html = htm.bind(React.createElement);
-    var useState = React.useState, useMemo = React.useMemo, useCallback = React.useCallback;
-    var useRef = React.useRef, useEffect = React.useEffect;
+    var html=htm.bind(React.createElement);
+    var useState=React.useState,useMemo=React.useMemo,useCallback=React.useCallback,useRef=React.useRef,useEffect=React.useEffect;
 
-    // ─── RGDU 2026 Parameters ─────────────────────────────────────────
-    var RGDU = { smicHoraire:12.02, seuil:3, tMin:0.02, tMax:0.4013, tDelta:0.3813, puissance:1.75 };
-    var COTIS_PATRONALES_RATE = 0.48;
-    var TAB_NAMES = ['Upload','Simulation','Graphiques','\u0053ynth\u00e8se','PERCOL'];
+    var RGDU={smicHoraire:12.02,seuil:3,tMin:0.02,tMax:0.4013,tDelta:0.3813,puissance:1.75};
+    var COTIS=0.48;
+    var REPO='Bencode92/CET_OPTIM';
+    var DATA_PATH='data/historique/latest_marges.csv';
+    var TAB_NAMES=['Upload','Simulation','Graphiques','Synth\u00e8se','PERCOL'];
 
-    // ─── RGDU Calculation ─────────────────────────────────────────────
-    function computeRgdu(hrs, brut) {
-      if (hrs <= 0 || brut <= 0) return 0;
-      var smicRef = hrs * RGDU.smicHoraire;
-      var ratio = (RGDU.seuil * smicRef) / brut;
-      if (ratio <= 1) return 0;
-      var inner = 0.5 * (ratio - 1);
-      var c = Math.min(RGDU.tMin + RGDU.tDelta * Math.pow(inner, RGDU.puissance), RGDU.tMax);
-      return c * brut;
-    }
-    function computeRow(row, pctIfm, pctIccp) {
-      var cetIfm = row.ifm * pctIfm, cetIccp = row.iccp * pctIccp;
-      var cetTotal = cetIfm + cetIccp, brutCet = row.brut - cetIfm - cetIccp;
-      var redBase = computeRgdu(row.hrs, row.brut), redCet = computeRgdu(row.hrs, brutCet);
-      return Object.assign({}, row, {cetIfm:cetIfm, cetIccp:cetIccp, cetTotal:cetTotal, brutCet:brutCet, redBase:redBase, redCet:redCet, gain:redCet-redBase});
+    // ─── GitHub API helpers ───────────────────────────────────────────
+    function getToken(){return localStorage.getItem('gh_token')||'';}
+    function setToken(t){localStorage.setItem('gh_token',t);}
+
+    function ghFetch(path,opts){
+      var tk=getToken();
+      var headers={'Accept':'application/vnd.github.v3+json'};
+      if(tk) headers['Authorization']='token '+tk;
+      return fetch('https://api.github.com/repos/'+REPO+'/contents/'+path,Object.assign({headers:headers},opts||{}));
     }
 
-    // ─── CSV/XLSX Parser ──────────────────────────────────────────────
-    function parseFileData(buf, fileName) {
-      var ext = fileName.split('.').pop().toLowerCase(), rows;
-      if (ext === 'csv') { var t = new TextDecoder('utf-8').decode(buf); var wb = XLSX.read(t,{type:'string'}); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); }
-      else { var wb2 = XLSX.read(buf,{type:'array'}); rows = XLSX.utils.sheet_to_json(wb2.Sheets[wb2.SheetNames[0]]); }
-      function detect(cols,p){return cols.find(function(c){var cl=c.toLowerCase();return p.every(function(x){return cl.includes(x);});});}
-      var cols = rows.length > 0 ? Object.keys(rows[0]) : [];
-      var cm = {
-        hrs: detect(cols,['hrs','paye'])||detect(cols,['heures']),
-        brut: detect(cols,['brut','r\u00e9el'])||detect(cols,['brut','reel']),
-        ifm: detect(cols,['ifm','r\u00e9el'])||detect(cols,['ifm','reel'])||detect(cols,['ifm']),
-        iccp: detect(cols,['iccp','r\u00e9el'])||detect(cols,['iccp','reel'])||detect(cols,['iccp']),
-        matricule: detect(cols,['matricule']),
-        nom: detect(cols,['nom'])||detect(cols,['salari\u00e9']),
-        cotPat: detect(cols,['cot','pat']),
-        reduction: detect(cols,['r\u00e9duction'])||detect(cols,['reduction']),
-        marge: cols.find(function(c){return c.toLowerCase().trim()==='marge';})
-      };
-      var missing = ['hrs','brut','ifm','iccp'].filter(function(k){return !cm[k];});
-      if (missing.length) throw new Error('Colonnes manquantes : '+missing.join(', '));
-      return rows.map(function(r){return {
-        matricule:r[cm.matricule]||'', nom:r[cm.nom]||'',
-        hrs:parseFloat(r[cm.hrs])||0, brut:parseFloat(r[cm.brut])||0,
-        ifm:parseFloat(r[cm.ifm])||0, iccp:parseFloat(r[cm.iccp])||0,
-        cotPat:cm.cotPat?parseFloat(r[cm.cotPat])||0:0,
-        reductionActuelle:cm.reduction?parseFloat(r[cm.reduction])||0:0,
-        marge:cm.marge?parseFloat(r[cm.marge])||0:0
-      };}).filter(function(r){return r.hrs>0&&r.ifm>0;});
+    function loadFromGitHub(){
+      return ghFetch(DATA_PATH).then(function(r){
+        if(!r.ok) throw new Error('not found');
+        return r.json();
+      }).then(function(json){
+        var content=atob(json.content.replace(/\n/g,''));
+        return {csv:content, sha:json.sha};
+      });
+    }
+
+    function saveToGitHub(csvContent){
+      var tk=getToken();
+      if(!tk) return Promise.reject(new Error('Token GitHub requis'));
+      // Get existing file SHA first
+      return ghFetch(DATA_PATH).then(function(r){
+        if(r.ok) return r.json().then(function(j){return j.sha;});
+        return null;
+      }).then(function(sha){
+        var body={message:'data: update marges CSV ('+new Date().toISOString().slice(0,10)+')',content:btoa(unescape(encodeURIComponent(csvContent)))};
+        if(sha) body.sha=sha;
+        return ghFetch(DATA_PATH,{method:'PUT',body:JSON.stringify(body)});
+      }).then(function(r){
+        if(!r.ok) return r.json().then(function(j){throw new Error(j.message||'Erreur GitHub');});
+        return r.json();
+      });
+    }
+
+    // ─── RGDU Calc ────────────────────────────────────────────────────
+    function computeRgdu(hrs,brut){
+      if(hrs<=0||brut<=0)return 0;
+      var r=(RGDU.seuil*hrs*RGDU.smicHoraire)/brut;
+      if(r<=1)return 0;
+      return Math.min(RGDU.tMin+RGDU.tDelta*Math.pow(0.5*(r-1),RGDU.puissance),RGDU.tMax)*brut;
+    }
+    function computeRow(row,pi,pc){
+      var ci=row.ifm*pi,cc=row.iccp*pc,ct=ci+cc,bc=row.brut-ci-cc;
+      var rb=computeRgdu(row.hrs,row.brut),rc=computeRgdu(row.hrs,bc);
+      return Object.assign({},row,{cetIfm:ci,cetIccp:cc,cetTotal:ct,brutCet:bc,redBase:rb,redCet:rc,gain:rc-rb});
+    }
+
+    // ─── Parser ───────────────────────────────────────────────────────
+    function parseCSVString(text){
+      var wb=XLSX.read(text,{type:'string'});
+      return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    }
+    function parseFileData(buf,name){
+      var ext=name.split('.').pop().toLowerCase(),rows;
+      if(ext==='csv'){rows=parseCSVString(new TextDecoder('utf-8').decode(buf));}
+      else{var wb=XLSX.read(buf,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);}
+      return mapRows(rows);
+    }
+    function mapRows(rows){
+      function det(cols,p){return cols.find(function(c){var cl=c.toLowerCase();return p.every(function(x){return cl.includes(x);});});}
+      var cols=rows.length?Object.keys(rows[0]):[];
+      var cm={hrs:det(cols,['hrs','paye'])||det(cols,['heures']),brut:det(cols,['brut','r\u00e9el'])||det(cols,['brut','reel']),
+        ifm:det(cols,['ifm','r\u00e9el'])||det(cols,['ifm','reel'])||det(cols,['ifm']),
+        iccp:det(cols,['iccp','r\u00e9el'])||det(cols,['iccp','reel'])||det(cols,['iccp']),
+        matricule:det(cols,['matricule']),nom:det(cols,['nom'])||det(cols,['salari\u00e9']),
+        cotPat:det(cols,['cot','pat']),reduction:det(cols,['r\u00e9duction'])||det(cols,['reduction']),
+        marge:cols.find(function(c){return c.toLowerCase().trim()==='marge';})};
+      var miss=['hrs','brut','ifm','iccp'].filter(function(k){return !cm[k];});
+      if(miss.length)throw new Error('Colonnes manquantes : '+miss.join(', '));
+      return rows.map(function(r){return{matricule:r[cm.matricule]||'',nom:r[cm.nom]||'',hrs:parseFloat(r[cm.hrs])||0,brut:parseFloat(r[cm.brut])||0,ifm:parseFloat(r[cm.ifm])||0,iccp:parseFloat(r[cm.iccp])||0,cotPat:cm.cotPat?parseFloat(r[cm.cotPat])||0:0,reductionActuelle:cm.reduction?parseFloat(r[cm.reduction])||0:0,marge:cm.marge?parseFloat(r[cm.marge])||0:0};}).filter(function(r){return r.hrs>0&&r.ifm>0;});
     }
 
     // ─── Formatters ───────────────────────────────────────────────────
     function fmtEur(v){return v!=null?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}):'\u2014';}
     function fmtEur2(v){return v!=null?v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2}):'\u2014';}
-    function fmtPct(v){return (v*100).toFixed(0)+' %';}
+    function fmtPct(v){return(v*100).toFixed(0)+' %';}
 
-    // ─── Chart.js wrapper ─────────────────────────────────────────────
-    function ChartCanvas(props) {
-      var ref = useRef(null), chartRef = useRef(null);
-      useEffect(function() {
-        if (!ref.current) return;
-        if (chartRef.current) chartRef.current.destroy();
-        chartRef.current = new Chart(ref.current, props.config);
-        return function() { if (chartRef.current) chartRef.current.destroy(); };
-      }, [JSON.stringify(props.config)]);
-      return html`<canvas ref=${ref} height=${props.height || 300}></canvas>`;
+    // ─── Chart wrapper ────────────────────────────────────────────────
+    Chart.defaults.color='#94a3b8';
+    Chart.defaults.borderColor='#1e293b';
+    function ChartCanvas(props){
+      var ref=useRef(null),ch=useRef(null);
+      useEffect(function(){
+        if(!ref.current)return;
+        if(ch.current)ch.current.destroy();
+        ch.current=new Chart(ref.current,props.config);
+        return function(){if(ch.current)ch.current.destroy();};
+      },[JSON.stringify(props.config)]);
+      return html`<canvas ref=${ref} height=${props.height||300}></canvas>`;
     }
 
     // ─── Slider ───────────────────────────────────────────────────────
-    function SliderParam(props) {
-      var min=props.min!=null?props.min:0, max=props.max!=null?props.max:100;
-      var step=props.step!=null?props.step:1, unit=props.unit!=null?props.unit:'%';
+    function SliderParam(p){
+      var mn=p.min!=null?p.min:0,mx=p.max!=null?p.max:100,st=p.step!=null?p.step:1,u=p.unit!=null?p.unit:'%';
       return html`<div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-gray-700">${props.label} : <span className="font-bold text-blue-700">${props.value}${unit}</span></label>
-        <input type="range" min=${min} max=${max} step=${step} value=${props.value} onChange=${function(e){props.onChange(Number(e.target.value));}} className="w-full accent-blue-600" />
-        <div className="flex justify-between text-xs text-gray-400"><span>${min}${unit}</span><span>${max}${unit}</span></div>
+        <label className="text-sm font-medium text-slate-300">${p.label} : <span className="font-bold text-green-400">${p.value}${u}</span></label>
+        <input type="range" min=${mn} max=${mx} step=${st} value=${p.value} onChange=${function(e){p.onChange(Number(e.target.value));}} className="w-full accent-green-500" />
+        <div className="flex justify-between text-xs text-slate-500"><span>${mn}${u}</span><span>${mx}${u}</span></div>
       </div>`;
     }
 
-    // ─── Main Component ───────────────────────────────────────────────
-    function Simulateur() {
+    // ─── Main ─────────────────────────────────────────────────────────
+    function Simulateur(){
       var _at=useState(0),activeTab=_at[0],setActiveTab=_at[1];
       var _d=useState([]),data=_d[0],setData=_d[1];
       var _fn=useState(''),fileName=_fn[0],setFileName=_fn[1];
       var _er=useState(''),error=_er[0],setError=_er[1];
+      var _msg=useState(''),msg=_msg[0],setMsg=_msg[1];
+      var _ld=useState(true),loading=_ld[0],setLoading=_ld[1];
+      var _csv=useState(''),rawCsv=_csv[0],setRawCsv=_csv[1];
       var _pi=useState(30),pctIfm=_pi[0],setPctIfm=_pi[1];
       var _pc=useState(30),pctIccp=_pc[0],setPctIccp=_pc[1];
       var _ef=useState(660),effectifTotal=_ef[0],setEffectifTotal=_ef[1];
       var _fs=useState(16),forfaitSocial=_fs[0],setForfaitSocial=_fs[1];
       var _rc=useState(3),rendementCet=_rc[0],setRendementCet=_rc[1];
       var _ta=useState(30),tauxAdhesion=_ta[0],setTauxAdhesion=_ta[1];
+      var _tk=useState(getToken()),token=_tk[0],setTokenState=_tk[1];
+      var _showTk=useState(!getToken()),showTokenInput=_showTk[0],setShowTokenInput=_showTk[1];
 
-      var handleFile = useCallback(function(e) {
-        var file = e.target.files && e.target.files[0]; if (!file) return;
-        setError('');
-        file.arrayBuffer().then(function(buf) {
-          try { var p=parseFileData(buf,file.name); setData(p); setFileName(file.name); setActiveTab(1); }
-          catch(err) { setError(err.message); }
+      // Auto-load from GitHub on mount
+      useEffect(function(){
+        loadFromGitHub().then(function(res){
+          try{
+            var rows=parseCSVString(res.csv);
+            var parsed=mapRows(rows);
+            setData(parsed); setFileName('latest_marges.csv (GitHub)'); setRawCsv(res.csv);
+            if(parsed.length>0) setActiveTab(1);
+          }catch(e){/* no valid data on GH */}
+        }).catch(function(){/* no file yet */}).finally(function(){setLoading(false);});
+      },[]);
+
+      var handleFile=useCallback(function(e){
+        var file=e.target.files&&e.target.files[0];if(!file)return;
+        setError('');setMsg('');
+        file.arrayBuffer().then(function(buf){
+          try{
+            var parsed=parseFileData(buf,file.name);
+            // Read as text for saving
+            var reader=new FileReader();
+            reader.onload=function(){
+              var csvText=reader.result;
+              setRawCsv(csvText);
+              setData(parsed);setFileName(file.name);setActiveTab(1);
+              // Auto-save to GitHub
+              if(getToken()){
+                setMsg('Sauvegarde sur GitHub...');
+                saveToGitHub(csvText).then(function(){setMsg('\u2713 Sauvegard\u00e9 sur GitHub');setTimeout(function(){setMsg('');},3000);})
+                  .catch(function(err){setMsg('\u26a0 '+err.message);});
+              }
+            };
+            reader.readAsText(file);
+          }catch(err){setError(err.message);}
         });
-      }, []);
+      },[]);
 
-      var simulated = useMemo(function(){return data.map(function(r){return computeRow(r,pctIfm/100,pctIccp/100);});}, [data,pctIfm,pctIccp]);
+      var handleTokenSave=useCallback(function(){
+        setToken(token);setShowTokenInput(false);setMsg('\u2713 Token sauvegard\u00e9');setTimeout(function(){setMsg('');},2000);
+      },[token]);
 
-      var totals = useMemo(function() {
-        var t={n:simulated.length,hrs:0,brut:0,ifm:0,iccp:0,cetTotal:0,redBase:0,redCet:0,gain:0,cotPat:0,reductionActuelle:0,marge:0};
-        simulated.forEach(function(r){t.hrs+=r.hrs;t.brut+=r.brut;t.ifm+=r.ifm;t.iccp+=r.iccp;t.cetTotal+=r.cetTotal;t.redBase+=r.redBase;t.redCet+=r.redCet;t.gain+=r.gain;t.cotPat+=r.cotPat;t.reductionActuelle+=r.reductionActuelle;t.marge+=r.marge;});
+      var simulated=useMemo(function(){return data.map(function(r){return computeRow(r,pctIfm/100,pctIccp/100);});},[data,pctIfm,pctIccp]);
+      var totals=useMemo(function(){
+        var t={n:simulated.length,hrs:0,brut:0,ifm:0,iccp:0,cetTotal:0,redBase:0,redCet:0,gain:0,cotPat:0,marge:0};
+        simulated.forEach(function(r){t.hrs+=r.hrs;t.brut+=r.brut;t.ifm+=r.ifm;t.iccp+=r.iccp;t.cetTotal+=r.cetTotal;t.redBase+=r.redBase;t.redCet+=r.redCet;t.gain+=r.gain;t.cotPat+=r.cotPat;t.marge+=r.marge;});
         return t;
-      }, [simulated]);
+      },[simulated]);
 
-      var xf = totals.n>0?effectifTotal/totals.n:1;
-      var gainAnnuel = totals.gain*12, gainExtrapole = gainAnnuel*xf;
+      var xf=totals.n>0?effectifTotal/totals.n:1;
+      var gainAnnuel=totals.gain*12,gainExtrapole=gainAnnuel*xf;
 
-      var scenarioData = useMemo(function(){
+      var scenarioData=useMemo(function(){
         return [0,10,20,30,50,100].map(function(pct){
           var rows=data.map(function(r){return computeRow(r,pct/100,pct/100);});
           var g=rows.reduce(function(s,r){return s+r.gain;},0);
-          return {name:pct+'%',gainMensuel:g,gainAnnuel:g*12,gainExtrapole:g*12*xf};
+          return{name:pct+'%',gM:g,gA:g*12,gX:g*12*xf};
         });
       },[data,xf]);
 
-      var percolData = useMemo(function(){
-        var avg=totals.n>0?totals.cetTotal/totals.n:0, ann=avg*12;
-        var rend=ann*(rendementCet/100), tot=ann+rend;
-        var cashCotis=ann*COTIS_PATRONALES_RATE;
-        var cetCashCost=cashCotis+rend;
-        var fs=forfaitSocial/100, fAmt=tot*fs, cetPercolCost=fAmt+rend;
-        var econ=cashCotis-cetPercolCost;
-        var nbAdh=Math.round(effectifTotal*(tauxAdhesion/100));
-        var adhScens=[20,30,50,70,100].map(function(t){var nb=Math.round(effectifTotal*(t/100));return{taux:t+'%',nb:nb,econ:econ*nb};});
-        return {
-          avg:avg, ann:ann, rend:rend,
-          scenarios:[
-            {name:'Cash direct',principal:ann,rendVerse:0,cotis:cashCotis,forfait:0,cout:cashCotis,econ:0},
-            {name:'CET \u2192 Cash',principal:ann,rendVerse:rend,cotis:cashCotis,forfait:0,cout:cetCashCost,econ:cashCotis-cetCashCost},
-            {name:'CET \u2192 PERCOL',principal:ann,rendVerse:rend,cotis:0,forfait:fAmt,cout:cetPercolCost,econ:econ}
-          ],
-          nbAdh:nbAdh, econTotale:econ*nbAdh, adhScens:adhScens
-        };
+      var percolData=useMemo(function(){
+        var avg=totals.n>0?totals.cetTotal/totals.n:0,ann=avg*12;
+        var rend=ann*(rendementCet/100),tot=ann+rend;
+        var cc=ann*COTIS,ccc=cc+rend;
+        var fs=forfaitSocial/100,fa=tot*fs,ccp=fa+rend;
+        var ec=cc-ccp,nbA=Math.round(effectifTotal*(tauxAdhesion/100));
+        var adhS=[20,30,50,70,100].map(function(t){var nb=Math.round(effectifTotal*(t/100));return{taux:t+'%',nb:nb,econ:ec*nb};});
+        return{avg:avg,ann:ann,rend:rend,scenarios:[
+          {name:'Cash direct',principal:ann,rendV:0,cotis:cc,forfait:0,cout:cc,econ:0},
+          {name:'CET \u2192 Cash',principal:ann,rendV:rend,cotis:cc,forfait:0,cout:ccc,econ:cc-ccc},
+          {name:'CET \u2192 PERCOL',principal:ann,rendV:rend,cotis:0,forfait:fa,cout:ccp,econ:ec}
+        ],nbA:nbA,econTot:ec*nbA,adhS:adhS};
       },[totals,rendementCet,forfaitSocial,effectifTotal,tauxAdhesion]);
 
-      var hasData = data.length>0;
+      var hasData=data.length>0;
 
       // ═══ Chart configs ══════════════════════════════════════════════
-      var barScenarioConfig = useMemo(function(){
-        return {type:'bar',data:{labels:scenarioData.map(function(s){return s.name;}),datasets:[
-          {label:'Gain annuel (fichier)',data:scenarioData.map(function(s){return s.gainAnnuel;}),backgroundColor:'#2563eb',borderRadius:4},
-          {label:'Gain extrapol\u00e9 ('+effectifTotal+' sal.)',data:scenarioData.map(function(s){return s.gainExtrapole;}),backgroundColor:'#16a34a',borderRadius:4}
-        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+' : '+fmtEur(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k\u20ac';}}}}}};
-      },[scenarioData,effectifTotal]);
+      var barScenCfg=useMemo(function(){return{type:'bar',data:{labels:scenarioData.map(function(s){return s.name;}),datasets:[
+        {label:'Gain annuel (fichier)',data:scenarioData.map(function(s){return s.gA;}),backgroundColor:'#3b82f6',borderRadius:4},
+        {label:'Gain extrapol\u00e9 ('+effectifTotal+')',data:scenarioData.map(function(s){return s.gX;}),backgroundColor:'#22c55e',borderRadius:4}
+      ]},options:{responsive:true,plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:function(c){return c.dataset.label+' : '+fmtEur(c.parsed.y);}}}},scales:{y:{grid:{color:'#1e293b'},ticks:{callback:function(v){return(v/1000).toFixed(0)+'k\u20ac';}}},x:{grid:{color:'#1e293b'}}}}};},[scenarioData,effectifTotal]);
 
-      var lineGainConfig = useMemo(function(){
-        return {type:'line',data:{labels:scenarioData.map(function(s){return s.name;}),datasets:[
-          {label:'Gain mensuel',data:scenarioData.map(function(s){return s.gainMensuel;}),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,0.1)',fill:true,tension:0.3,pointRadius:5}
-        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return fmtEur2(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return v.toFixed(0)+'\u20ac';}}}}}};
-      },[scenarioData]);
+      var lineCfg=useMemo(function(){return{type:'line',data:{labels:scenarioData.map(function(s){return s.name;}),datasets:[
+        {label:'Gain mensuel',data:scenarioData.map(function(s){return s.gM;}),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.15)',fill:true,tension:0.3,pointRadius:5,pointBackgroundColor:'#22c55e'}
+      ]},options:{responsive:true,plugins:{legend:{labels:{color:'#e2e8f0'}}},scales:{y:{grid:{color:'#1e293b'},ticks:{callback:function(v){return v.toFixed(0)+'\u20ac';}}},x:{grid:{color:'#1e293b'}}}}};},[scenarioData]);
 
-      var distConfig = useMemo(function(){
-        return {type:'bar',data:{labels:simulated.map(function(_,i){return i+1;}),datasets:[
-          {label:'Gain RGDU',data:simulated.map(function(r){return r.gain;}),backgroundColor:'#16a34a',borderRadius:2}
-        ]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return fmtEur2(ctx.parsed.y);}}}},scales:{x:{title:{display:true,text:'Salari\u00e9'}},y:{ticks:{callback:function(v){return v.toFixed(1)+'\u20ac';}}}}}};
-      },[simulated]);
+      var distCfg=useMemo(function(){return{type:'bar',data:{labels:simulated.map(function(_,i){return i+1;}),datasets:[
+        {label:'Gain RGDU',data:simulated.map(function(r){return r.gain;}),backgroundColor:'#22c55e',borderRadius:2}
+      ]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e293b'},title:{display:true,text:'Salari\u00e9',color:'#94a3b8'}},y:{grid:{color:'#1e293b'},ticks:{callback:function(v){return v.toFixed(1)+'\u20ac';}}}}}};},[simulated]);
 
-      var synthBarConfig = useMemo(function(){
-        var sc=[10,30,50].map(function(pct){var rows=data.map(function(r){return computeRow(r,pct/100,pct/100);});var g=rows.reduce(function(s,r){return s+r.gain;},0);return{name:pct+'% CET',val:g*12*xf};});
-        return {type:'bar',data:{labels:sc.map(function(s){return s.name;}),datasets:[
-          {label:'Gain annuel extrapol\u00e9',data:sc.map(function(s){return s.val;}),backgroundColor:['#2563eb','#f59e0b','#16a34a'],borderRadius:4}
-        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return fmtEur(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k\u20ac';}}}}}};
+      var synthCfg=useMemo(function(){
+        var sc=[10,30,50].map(function(p){var rows=data.map(function(r){return computeRow(r,p/100,p/100);});var g=rows.reduce(function(s,r){return s+r.gain;},0);return{n:p+'%',v:g*12*xf};});
+        return{type:'bar',data:{labels:sc.map(function(s){return s.n;}),datasets:[{label:'Gain extrapol\u00e9',data:sc.map(function(s){return s.v;}),backgroundColor:['#3b82f6','#f59e0b','#22c55e'],borderRadius:4}]},options:{responsive:true,plugins:{legend:{labels:{color:'#e2e8f0'}}},scales:{y:{grid:{color:'#1e293b'},ticks:{callback:function(v){return(v/1000).toFixed(0)+'k\u20ac';}}},x:{grid:{color:'#1e293b'}}}}};
       },[data,xf]);
 
-      var percolBarConfig = useMemo(function(){
-        return {type:'bar',data:{labels:percolData.scenarios.map(function(s){return s.name;}),datasets:[
-          {label:'Cotisations patronales',data:percolData.scenarios.map(function(s){return s.cotis;}),backgroundColor:'#ef4444'},
-          {label:'Forfait social',data:percolData.scenarios.map(function(s){return s.forfait;}),backgroundColor:'#f59e0b'},
-          {label:'Rendement vers\u00e9',data:percolData.scenarios.map(function(s){return s.rendVerse;}),backgroundColor:'#3b82f6'}
-        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+' : '+fmtEur(ctx.parsed.y);}}}},scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:function(v){return v.toFixed(0)+'\u20ac';}}}}}};
+      var pBarCfg=useMemo(function(){return{type:'bar',data:{labels:percolData.scenarios.map(function(s){return s.name;}),datasets:[
+        {label:'Cotisations patronales',data:percolData.scenarios.map(function(s){return s.cotis;}),backgroundColor:'#ef4444'},
+        {label:'Forfait social',data:percolData.scenarios.map(function(s){return s.forfait;}),backgroundColor:'#f59e0b'},
+        {label:'Rendement vers\u00e9',data:percolData.scenarios.map(function(s){return s.rendV;}),backgroundColor:'#3b82f6'}
+      ]},options:{responsive:true,plugins:{legend:{labels:{color:'#e2e8f0'}}},scales:{x:{stacked:true,grid:{color:'#1e293b'}},y:{stacked:true,grid:{color:'#1e293b'},ticks:{callback:function(v){return v.toFixed(0)+'\u20ac';}}}}}};
       },[percolData]);
 
-      var adhBarConfig = useMemo(function(){
-        var colors=['#2563eb','#16a34a','#f59e0b','#ef4444','#8b5cf6'];
-        return {type:'bar',data:{labels:percolData.adhScens.map(function(s){return s.taux;}),datasets:[
-          {label:'\u00c9conomie annuelle',data:percolData.adhScens.map(function(s){return s.econ;}),backgroundColor:colors,borderRadius:4}
-        ]},options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(ctx){return fmtEur(ctx.parsed.y);}}}},scales:{y:{ticks:{callback:function(v){return (v/1000).toFixed(0)+'k\u20ac';}}}}}};
+      var adhCfg=useMemo(function(){return{type:'bar',data:{labels:percolData.adhS.map(function(s){return s.taux;}),datasets:[
+        {label:'\u00c9conomie annuelle',data:percolData.adhS.map(function(s){return s.econ;}),backgroundColor:['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6'],borderRadius:4}
+      ]},options:{responsive:true,plugins:{legend:{labels:{color:'#e2e8f0'}}},scales:{y:{grid:{color:'#1e293b'},ticks:{callback:function(v){return(v/1000).toFixed(0)+'k\u20ac';}}},x:{grid:{color:'#1e293b'}}}}};
       },[percolData]);
 
-      // ═══════════════════════════════════════════════════════════════
-      return html`<div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      // ═══ RENDER ═════════════════════════════════════════════════════
+      if(loading) return html`<div className="min-h-screen bg-navy-900 flex items-center justify-center"><div className="text-green-400 text-lg">Chargement...</div></div>`;
+
+      return html`<div className="min-h-screen bg-navy-900 p-4 md:p-8">
         <header className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Simulateur CET \u00d7 RGDU 2026</h1>
-          <p className="text-sm text-gray-500">Optimisation charges patronales int\u00e9rim \u2014 Sch\u00e9ma 3 \u00e9tages
-            ${fileName && html`<span className="ml-2 text-blue-600">(${fileName} \u2014 ${data.length} lignes)</span>`}
+          <h1 className="text-2xl font-bold text-white">Simulateur CET \u00d7 RGDU 2026</h1>
+          <p className="text-sm text-slate-400">Optimisation charges patronales int\u00e9rim \u2014 Sch\u00e9ma 3 \u00e9tages
+            ${fileName && html`<span className="ml-2 text-green-400">(${fileName} \u2014 ${data.length} lignes)</span>`}
           </p>
         </header>
 
-        <nav className="flex gap-1 mb-6 border-b border-gray-200">
-          ${TAB_NAMES.map(function(name,i){
-            var dis=i>0&&!hasData;
+        <nav className="flex gap-1 mb-6 border-b border-slate-700">
+          ${TAB_NAMES.map(function(name,i){var dis=i>0&&!hasData;
             return html`<button key=${name} onClick=${function(){if(!dis)setActiveTab(i);}}
-              className=${"px-4 py-2 text-sm font-medium rounded-t transition-colors "+(activeTab===i?'bg-white border border-b-0 border-gray-200 text-blue-700 ':'text-gray-500 hover:text-gray-700 hover:bg-gray-100 ')+(dis?'opacity-40 cursor-not-allowed':'cursor-pointer')}
+              className=${"px-4 py-2 text-sm font-medium rounded-t transition-colors "+(activeTab===i?'bg-navy-700 border border-b-0 border-slate-600 text-green-400 ':'text-slate-400 hover:text-white hover:bg-navy-800 ')+(dis?'opacity-30 cursor-not-allowed':'cursor-pointer')}
             >${name}</button>`;
           })}
         </nav>
 
-        ${error && html`<div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">${error}</div>`}
+        ${error && html`<div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-red-300 text-sm">${error}</div>`}
+        ${msg && html`<div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded text-green-300 text-sm">${msg}</div>`}
 
         ${activeTab===0 && html`<section className="max-w-xl mx-auto">
-          <div className="bg-white rounded-xl shadow p-8 text-center">
-            <div className="mb-4 text-5xl text-gray-300">\ud83d\udcc4</div>
-            <h2 className="text-lg font-semibold mb-2">Charger un fichier Marges</h2>
-            <p className="text-sm text-gray-500 mb-6">CSV ou XLSX. Colonnes : Hrs Paye, Brut r\u00e9el, IFM r\u00e9elles, ICCP r\u00e9elles.</p>
-            <label className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-lg cursor-pointer hover:bg-blue-700 transition">
-              S\u00e9lectionner un fichier<input type="file" accept=".csv,.xlsx,.xls" onChange=${handleFile} className="hidden" />
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-8 text-center">
+            <div className="mb-4 text-5xl">\ud83d\udcc4</div>
+            <h2 className="text-lg font-semibold mb-2 text-white">Charger un fichier Marges</h2>
+            <p className="text-sm text-slate-400 mb-6">CSV ou XLSX \u2014 Colonnes : Hrs Paye, Brut r\u00e9el, IFM r\u00e9elles, ICCP r\u00e9elles.</p>
+            ${hasData && html`<div className="mb-4 p-3 bg-green-900/30 border border-green-800 rounded text-green-400 text-sm">
+              \u2713 Donn\u00e9es charg\u00e9es : ${data.length} salari\u00e9s depuis ${fileName}
+            </div>`}
+            <label className="inline-block px-6 py-3 bg-green-600 text-white font-medium rounded-lg cursor-pointer hover:bg-green-700 transition">
+              ${hasData?'Actualiser le fichier':'S\u00e9lectionner un fichier'}
+              <input type="file" accept=".csv,.xlsx,.xls" onChange=${handleFile} className="hidden" />
             </label>
-            ${fileName && html`<p className="mt-4 text-green-600 text-sm font-medium">\u2713 ${fileName} (${data.length} salari\u00e9s)</p>`}
           </div>
-          <div className="mt-6 bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-3 text-sm">Param\u00e8tres RGDU 2026</h3>
+
+          <!-- GitHub token config -->
+          <div className="mt-6 bg-navy-800 rounded-xl border border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm text-white">Sauvegarde GitHub</h3>
+              <button onClick=${function(){setShowTokenInput(!showTokenInput);}} className="text-xs text-slate-400 hover:text-green-400">${showTokenInput?'Masquer':'Configurer'}</button>
+            </div>
+            ${showTokenInput && html`<div className="space-y-2">
+              <p className="text-xs text-slate-400">Token GitHub (repo scope) pour sauvegarder les CSV dans data/historique/</p>
+              <input type="password" value=${token} onChange=${function(e){setTokenState(e.target.value);}}
+                placeholder="ghp_xxxxxxxxxxxx" className="w-full px-3 py-2 bg-navy-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:border-green-500 focus:outline-none" />
+              <button onClick=${handleTokenSave} className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Sauvegarder</button>
+            </div>`}
+            ${!showTokenInput && getToken() && html`<p className="text-xs text-green-400">\u2713 Token configur\u00e9 \u2014 les CSV seront sauvegard\u00e9s automatiquement</p>`}
+          </div>
+
+          <div className="mt-6 bg-navy-800 rounded-xl border border-slate-700 p-6">
+            <h3 className="font-semibold mb-3 text-sm text-white">Param\u00e8tres RGDU 2026</h3>
             <table className="w-full text-sm"><tbody>
               ${[['SMIC horaire',RGDU.smicHoraire+' \u20ac'],["Seuil d'extinction",RGDU.seuil+' \u00d7 SMIC'],['Tmin',fmtPct(RGDU.tMin)],['Tmax',fmtPct(RGDU.tMax)],['T\u03b4',fmtPct(RGDU.tDelta)],['Puissance',''+RGDU.puissance]].map(function(kv){
-                return html`<tr key=${kv[0]} className="border-b border-gray-100"><td className="py-1 text-gray-600">${kv[0]}</td><td className="py-1 font-mono text-right">${kv[1]}</td></tr>`;
+                return html`<tr key=${kv[0]} className="border-b border-slate-700"><td className="py-1 text-slate-400">${kv[0]}</td><td className="py-1 font-mono text-right text-white">${kv[1]}</td></tr>`;
               })}
             </tbody></table>
           </div>
         </section>`}
 
         ${activeTab===1 && hasData && html`<section>
-          <div className="bg-white rounded-xl shadow p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
             <${SliderParam} label="% IFM vers CET" value=${pctIfm} onChange=${setPctIfm} />
             <${SliderParam} label="% ICCP vers CET" value=${pctIccp} onChange=${setPctIccp} />
             <${SliderParam} label="Effectif total" value=${effectifTotal} onChange=${setEffectifTotal} min=${1} max=${5000} step=${10} unit="" />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            ${[['CET mensuel total',fmtEur(totals.cetTotal),'bg-blue-50 text-blue-800'],['Gain RGDU mensuel',fmtEur2(totals.gain),'bg-green-50 text-green-800'],['Gain annuel (fichier)',fmtEur(gainAnnuel),'bg-green-50 text-green-800'],['Gain annuel extrapol\u00e9',fmtEur(gainExtrapole),'bg-amber-50 text-amber-800']].map(function(c){
-              return html`<div key=${c[0]} className=${"rounded-xl p-4 "+c[2]}><div className="text-xs font-medium opacity-70">${c[0]}</div><div className="text-xl font-bold mt-1">${c[1]}</div></div>`;
+            ${[['CET mensuel total',fmtEur(totals.cetTotal),'border-blue-500 bg-blue-950/50'],['Gain RGDU mensuel',fmtEur2(totals.gain),'border-green-500 bg-green-950/50'],['Gain annuel (fichier)',fmtEur(gainAnnuel),'border-green-500 bg-green-950/50'],['Gain annuel extrapol\u00e9',fmtEur(gainExtrapole),'border-amber-500 bg-amber-950/50']].map(function(c){
+              return html`<div key=${c[0]} className=${"rounded-xl p-4 border-l-4 "+c[2]}><div className="text-xs font-medium text-slate-400">${c[0]}</div><div className="text-xl font-bold mt-1 text-white">${c[1]}</div></div>`;
             })}
           </div>
-          <div className="bg-white rounded-xl shadow overflow-x-auto">
+          <div className="bg-navy-800 rounded-xl border border-slate-700 overflow-x-auto">
             <table className="w-full text-xs">
-              <thead><tr className="bg-gray-800 text-white">
-                ${['#','Matricule','Hrs','Brut r\u00e9el','IFM','ICCP','CET IFM','CET ICCP','CET Total','Brut CET','R\u00e9d. base','R\u00e9d. CET','Gain'].map(function(h){return html`<th key=${h} className="px-2 py-2 text-left font-medium">${h}</th>`;})}
+              <thead><tr className="bg-navy-700">
+                ${['#','Matricule','Hrs','Brut r\u00e9el','IFM','ICCP','CET IFM','CET ICCP','CET Total','Brut CET','R\u00e9d. base','R\u00e9d. CET','Gain'].map(function(h){return html`<th key=${h} className="px-2 py-2 text-left font-medium text-slate-300">${h}</th>`;})}
               </tr></thead>
               <tbody>
-                ${simulated.slice(0,50).map(function(r,i){return html`<tr key=${i} className=${i%2===0?'bg-gray-50':'bg-white'}>
-                  <td className="px-2 py-1 text-gray-400">${i+1}</td><td className="px-2 py-1 font-mono">${r.matricule}</td>
-                  <td className="px-2 py-1 text-right">${r.hrs}</td><td className="px-2 py-1 text-right">${fmtEur2(r.brut)}</td>
+                ${simulated.slice(0,50).map(function(r,i){return html`<tr key=${i} className=${i%2===0?'bg-navy-900/50':'bg-navy-800'}>
+                  <td className="px-2 py-1 text-slate-500">${i+1}</td><td className="px-2 py-1 font-mono text-slate-300">${r.matricule}</td>
+                  <td className="px-2 py-1 text-right text-slate-300">${r.hrs}</td><td className="px-2 py-1 text-right">${fmtEur2(r.brut)}</td>
                   <td className="px-2 py-1 text-right">${fmtEur2(r.ifm)}</td><td className="px-2 py-1 text-right">${fmtEur2(r.iccp)}</td>
-                  <td className="px-2 py-1 text-right text-blue-600">${fmtEur2(r.cetIfm)}</td><td className="px-2 py-1 text-right text-blue-600">${fmtEur2(r.cetIccp)}</td>
-                  <td className="px-2 py-1 text-right font-medium text-blue-700">${fmtEur2(r.cetTotal)}</td><td className="px-2 py-1 text-right">${fmtEur2(r.brutCet)}</td>
+                  <td className="px-2 py-1 text-right text-blue-400">${fmtEur2(r.cetIfm)}</td><td className="px-2 py-1 text-right text-blue-400">${fmtEur2(r.cetIccp)}</td>
+                  <td className="px-2 py-1 text-right font-medium text-blue-300">${fmtEur2(r.cetTotal)}</td><td className="px-2 py-1 text-right">${fmtEur2(r.brutCet)}</td>
                   <td className="px-2 py-1 text-right">${fmtEur2(r.redBase)}</td><td className="px-2 py-1 text-right">${fmtEur2(r.redCet)}</td>
-                  <td className="px-2 py-1 text-right font-bold text-green-700">${fmtEur2(r.gain)}</td>
+                  <td className="px-2 py-1 text-right font-bold text-green-400">${fmtEur2(r.gain)}</td>
                 </tr>`;})}
-                <tr className="bg-gray-800 text-white font-medium">
-                  <td className="px-2 py-2" colSpan=${2}>TOTAUX (${totals.n})</td>
-                  <td className="px-2 py-2 text-right">${totals.hrs.toFixed(0)}</td><td className="px-2 py-2 text-right">${fmtEur(totals.brut)}</td>
+                <tr className="bg-navy-700 font-medium">
+                  <td className="px-2 py-2 text-white" colSpan=${2}>TOTAUX (${totals.n})</td>
+                  <td className="px-2 py-2 text-right text-white">${totals.hrs.toFixed(0)}</td><td className="px-2 py-2 text-right">${fmtEur(totals.brut)}</td>
                   <td className="px-2 py-2 text-right">${fmtEur(totals.ifm)}</td><td className="px-2 py-2 text-right">${fmtEur(totals.iccp)}</td>
                   <td className="px-2 py-2 text-right">${fmtEur(totals.cetTotal*pctIfm/((pctIfm+pctIccp)||1))}</td>
                   <td className="px-2 py-2 text-right">${fmtEur(totals.cetTotal*pctIccp/((pctIfm+pctIccp)||1))}</td>
@@ -286,124 +366,90 @@
                 </tr>
               </tbody>
             </table>
-            ${simulated.length>50 && html`<p className="text-xs text-gray-400 p-2 text-center">Affichage limit\u00e9 aux 50 premi\u00e8res lignes sur ${simulated.length}</p>`}
+            ${simulated.length>50 && html`<p className="text-xs text-slate-500 p-2 text-center">50 premi\u00e8res lignes sur ${simulated.length}</p>`}
           </div>
         </section>`}
 
         ${activeTab===2 && hasData && html`<section className="space-y-8">
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4">Gain RGDU annuel par sc\u00e9nario CET</h3>
-            <${ChartCanvas} config=${barScenarioConfig} height=${350} />
-          </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4">Courbe du gain RGDU mensuel</h3>
-            <${ChartCanvas} config=${lineGainConfig} height=${300} />
-          </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4">Distribution du gain par salari\u00e9 (mensuel)</h3>
-            <${ChartCanvas} config=${distConfig} height=${300} />
-          </div>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6"><h3 className="font-semibold mb-4 text-white">Gain RGDU annuel par sc\u00e9nario</h3><${ChartCanvas} config=${barScenCfg} height=${350} /></div>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6"><h3 className="font-semibold mb-4 text-white">Courbe du gain mensuel</h3><${ChartCanvas} config=${lineCfg} height=${300} /></div>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6"><h3 className="font-semibold mb-4 text-white">Distribution par salari\u00e9</h3><${ChartCanvas} config=${distCfg} height=${300} /></div>
         </section>`}
 
         ${activeTab===3 && hasData && html`<section className="space-y-6">
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4 text-lg">Synth\u00e8se \u2014 Projection 3 sc\u00e9narios CET</h3>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6">
+            <h3 className="font-semibold mb-4 text-lg text-white">Synth\u00e8se \u2014 3 sc\u00e9narios CET</h3>
             <table className="w-full text-sm">
-              <thead><tr className="border-b-2 border-gray-300">
-                <th className="py-2 text-left"></th>
-                <th className="py-2 text-right text-blue-600">Prudent (10%)</th>
-                <th className="py-2 text-right text-amber-600">Moyen (30%)</th>
-                <th className="py-2 text-right text-green-600">Ambitieux (50%)</th>
-              </tr></thead>
+              <thead><tr className="border-b-2 border-slate-600"><th className="py-2 text-left"></th><th className="py-2 text-right text-blue-400">Prudent (10%)</th><th className="py-2 text-right text-amber-400">Moyen (30%)</th><th className="py-2 text-right text-green-400">Ambitieux (50%)</th></tr></thead>
               <tbody>
                 ${(function(){
                   var sc=[10,30,50].map(function(p){var rows=data.map(function(r){return computeRow(r,p/100,p/100);});var g=rows.reduce(function(s,r){return s+r.gain;},0);var cet=rows.reduce(function(s,r){return s+r.cetTotal;},0);return{p:p,gM:g,gA:g*12,gX:g*12*xf,cM:cet,cA:cet*12,gAvg:g/(rows.length||1)};});
-                  return [['CET mensuel (fichier)',function(s){return fmtEur(s.cM);}],['CET annuel (fichier)',function(s){return fmtEur(s.cA);}],['Gain RGDU mensuel',function(s){return fmtEur2(s.gM);}],['Gain RGDU annuel (fichier)',function(s){return fmtEur(s.gA);}],['Gain RGDU annuel extrapol\u00e9',function(s){return fmtEur(s.gX);}],['Gain moyen / salari\u00e9 / mois',function(s){return fmtEur2(s.gAvg);}]].map(function(item){
-                    return html`<tr key=${item[0]} className="border-b border-gray-100"><td className="py-2 text-gray-600">${item[0]}</td>${sc.map(function(s){return html`<td key=${s.p} className="py-2 text-right font-mono">${item[1](s)}</td>`;})}</tr>`;
-                  });
+                  return[['CET mensuel',function(s){return fmtEur(s.cM);}],['CET annuel',function(s){return fmtEur(s.cA);}],['Gain RGDU mensuel',function(s){return fmtEur2(s.gM);}],['Gain RGDU annuel',function(s){return fmtEur(s.gA);}],['Gain annuel extrapol\u00e9',function(s){return fmtEur(s.gX);}],['Gain moyen/sal./mois',function(s){return fmtEur2(s.gAvg);}]].map(function(it){
+                    return html`<tr key=${it[0]} className="border-b border-slate-700"><td className="py-2 text-slate-400">${it[0]}</td>${sc.map(function(s){return html`<td key=${s.p} className="py-2 text-right font-mono text-white">${it[1](s)}</td>`;})}</tr>`;});
                 })()}
               </tbody>
             </table>
-            <p className="mt-4 text-xs text-gray-400">Extrapolation : \u00d7${xf.toFixed(2)} (fichier ${totals.n} \u2192 effectif ${effectifTotal}). Annualisation \u00d712.</p>
+            <p className="mt-4 text-xs text-slate-500">Extrapolation \u00d7${xf.toFixed(2)} (${totals.n} \u2192 ${effectifTotal}). Annualisation \u00d712.</p>
           </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4">Comparaison 3 sc\u00e9narios \u2014 Gain annuel extrapol\u00e9</h3>
-            <${ChartCanvas} config=${synthBarConfig} height=${300} />
-          </div>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6"><h3 className="font-semibold mb-4 text-white">Gain annuel extrapol\u00e9</h3><${ChartCanvas} config=${synthCfg} height=${300} /></div>
         </section>`}
 
         ${activeTab===4 && hasData && html`<section className="space-y-6">
-          <div className="bg-white rounded-xl shadow p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
             <${SliderParam} label="% IFM vers CET" value=${pctIfm} onChange=${setPctIfm} />
             <${SliderParam} label="% ICCP vers CET" value=${pctIccp} onChange=${setPctIccp} />
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Forfait social : <span className="font-bold text-blue-700">${forfaitSocial} %</span></label>
+              <label className="text-sm font-medium text-slate-300">Forfait social : <span className="font-bold text-green-400">${forfaitSocial} %</span></label>
               <div className="flex gap-2 mt-1">
-                ${[16,20].map(function(v){return html`<button key=${v} onClick=${function(){setForfaitSocial(v);}} className=${"px-4 py-2 rounded-lg font-medium text-sm transition "+(forfaitSocial===v?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200')}>${v}%${v===16?' (pilot\u00e9e)':' (standard)'}</button>`;})}
+                ${[16,20].map(function(v){return html`<button key=${v} onClick=${function(){setForfaitSocial(v);}} className=${"px-4 py-2 rounded-lg font-medium text-sm transition "+(forfaitSocial===v?'bg-green-600 text-white':'bg-navy-700 text-slate-400 hover:bg-navy-600')}>${v}%${v===16?' (pilot\u00e9e)':' (standard)'}</button>`;})}
               </div>
             </div>
             <${SliderParam} label="Rendement CET" value=${rendementCet} onChange=${setRendementCet} min=${1} max=${8} step=${0.5} />
           </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <${SliderParam} label="Taux d'adh\u00e9sion PERCOL" value=${tauxAdhesion} onChange=${setTauxAdhesion} min=${10} max=${100} step=${5} />
-          </div>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6"><${SliderParam} label="Taux d'adh\u00e9sion PERCOL" value=${tauxAdhesion} onChange=${setTauxAdhesion} min=${10} max=${100} step=${5} /></div>
 
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4 text-lg">Comparaison par int\u00e9rimaire (CET moyen : ${fmtEur2(percolData.avg)}/mois \u2192 ${fmtEur(percolData.ann)}/an)</h3>
-            <div className="overflow-x-auto"><table className="w-full text-sm">
-              <thead><tr className="border-b-2 border-gray-300">
-                <th className="py-2 text-left"></th><th className="py-2 text-right px-3 text-gray-600">Cash direct</th>
-                <th className="py-2 text-right px-3 text-amber-600">CET \u2192 Cash</th><th className="py-2 text-right px-3 text-green-600">CET \u2192 PERCOL</th>
-              </tr></thead>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6">
+            <h3 className="font-semibold mb-4 text-lg text-white">Comparaison par int\u00e9rimaire (CET moyen : ${fmtEur2(percolData.avg)}/mois \u2192 ${fmtEur(percolData.ann)}/an)</h3>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b-2 border-slate-600"><th className="py-2 text-left"></th><th className="py-2 text-right px-3 text-slate-400">Cash direct</th><th className="py-2 text-right px-3 text-amber-400">CET \u2192 Cash</th><th className="py-2 text-right px-3 text-green-400">CET \u2192 PERCOL</th></tr></thead>
               <tbody>
-                ${[['Principal annuel','principal'],['Rendement CET vers\u00e9','rendVerse'],['Cotisations patronales (48%)','cotis'],['Forfait social ('+forfaitSocial+'%)','forfait'],['Co\u00fbt total employeur','cout'],['\u00c9conomie vs cash','econ']].map(function(item){
-                  var label=item[0],key=item[1];
-                  return html`<tr key=${label} className=${"border-b border-gray-100 "+(key==='cout'?'font-bold bg-gray-50 ':'')+(key==='econ'?'font-bold ':'')}>
-                    <td className="py-2 text-gray-600">${label}</td>
-                    ${percolData.scenarios.map(function(s){return html`<td key=${s.name} className=${"py-2 text-right px-3 font-mono "+(key==='econ'&&s[key]>0?'text-green-700 ':'')+(key==='econ'&&s[key]<0?'text-red-600 ':'')}>${fmtEur(s[key])}</td>`;})}
+                ${[['Principal annuel','principal'],['Rendement CET','rendV'],['Cotisations (48%)','cotis'],['Forfait social ('+forfaitSocial+'%)','forfait'],['Co\u00fbt employeur','cout'],['\u00c9conomie vs cash','econ']].map(function(it){
+                  var l=it[0],k=it[1];
+                  return html`<tr key=${l} className=${"border-b border-slate-700 "+(k==='cout'?'font-bold bg-navy-700/50 ':'')+(k==='econ'?'font-bold ':'')}>
+                    <td className="py-2 text-slate-400">${l}</td>
+                    ${percolData.scenarios.map(function(s){return html`<td key=${s.name} className=${"py-2 text-right px-3 font-mono "+(k==='econ'&&s[k]>0?'text-green-400 ':'')+(k==='econ'&&s[k]<0?'text-red-400 ':'text-white')}>${fmtEur(s[k])}</td>`;})}
                   </tr>`;
                 })}
-              </tbody>
-            </table></div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold mb-4 text-lg">Extrapolation \u2014 ${effectifTotal} int\u00e9rimaires</h3>
-            <table className="w-full text-sm">
-              <thead><tr className="border-b-2 border-gray-300">
-                <th className="py-2 text-left">Taux adh\u00e9sion</th><th className="py-2 text-right">Nb</th><th className="py-2 text-right">\u00c9conomie annuelle</th>
-              </tr></thead>
-              <tbody>
-                ${percolData.adhScens.map(function(s){return html`<tr key=${s.taux} className=${"border-b border-gray-100 "+(s.taux===tauxAdhesion+'%'?'bg-blue-50 font-medium':'')}>
-                  <td className="py-2">${s.taux}</td><td className="py-2 text-right font-mono">${s.nb}</td>
-                  <td className="py-2 text-right font-mono text-green-700 font-bold">${fmtEur(s.econ)}</td>
-                </tr>`;})}
               </tbody>
             </table>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow p-6">
-              <h3 className="font-semibold mb-4">Co\u00fbt employeur par sc\u00e9nario</h3>
-              <${ChartCanvas} config=${percolBarConfig} height=${300} />
-            </div>
-            <div className="bg-white rounded-xl shadow p-6">
-              <h3 className="font-semibold mb-4">\u00c9conomie par taux d'adh\u00e9sion</h3>
-              <${ChartCanvas} config=${adhBarConfig} height=${300} />
-            </div>
+          <div className="bg-navy-800 rounded-xl border border-slate-700 p-6">
+            <h3 className="font-semibold mb-4 text-lg text-white">Extrapolation \u2014 ${effectifTotal} int\u00e9rimaires</h3>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b-2 border-slate-600"><th className="py-2 text-left text-slate-400">Taux</th><th className="py-2 text-right text-slate-400">Nb</th><th className="py-2 text-right text-slate-400">\u00c9conomie annuelle</th></tr></thead>
+              <tbody>${percolData.adhS.map(function(s){return html`<tr key=${s.taux} className=${"border-b border-slate-700 "+(s.taux===tauxAdhesion+'%'?'bg-green-900/30':'')}>
+                <td className="py-2 text-white">${s.taux}</td><td className="py-2 text-right font-mono text-white">${s.nb}</td><td className="py-2 text-right font-mono text-green-400 font-bold">${fmtEur(s.econ)}</td>
+              </tr>`;})}</tbody>
+            </table>
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-            <h3 className="font-bold text-green-800 text-lg mb-2">Levier principal : 48% \u2192 ${forfaitSocial}% = \u00e9conomie de ${(48-forfaitSocial)} points</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-navy-800 rounded-xl border border-slate-700 p-6"><h3 className="font-semibold mb-4 text-white">Co\u00fbt employeur</h3><${ChartCanvas} config=${pBarCfg} height=${300} /></div>
+            <div className="bg-navy-800 rounded-xl border border-slate-700 p-6"><h3 className="font-semibold mb-4 text-white">\u00c9conomie par adh\u00e9sion</h3><${ChartCanvas} config=${adhCfg} height=${300} /></div>
+          </div>
+
+          <div className="bg-green-950/50 border border-green-800 rounded-xl p-6">
+            <h3 className="font-bold text-green-400 text-lg mb-2">Levier : 48% \u2192 ${forfaitSocial}% = \u00e9conomie de ${48-forfaitSocial} points</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="text-center"><div className="text-3xl font-bold text-green-700">${fmtEur(percolData.scenarios[2].econ)}</div><div className="text-sm text-green-600">\u00e9conomie / int\u00e9rimaire / an</div></div>
-              <div className="text-center"><div className="text-3xl font-bold text-green-700">${percolData.nbAdh}</div><div className="text-sm text-green-600">adh\u00e9rents PERCOL (${tauxAdhesion}%)</div></div>
-              <div className="text-center"><div className="text-3xl font-bold text-green-700">${fmtEur(percolData.econTotale)}</div><div className="text-sm text-green-600">\u00e9conomie annuelle totale</div></div>
+              <div className="text-center"><div className="text-3xl font-bold text-green-400">${fmtEur(percolData.scenarios[2].econ)}</div><div className="text-sm text-green-600">\u00e9conomie / int\u00e9rimaire / an</div></div>
+              <div className="text-center"><div className="text-3xl font-bold text-green-400">${percolData.nbA}</div><div className="text-sm text-green-600">adh\u00e9rents (${tauxAdhesion}%)</div></div>
+              <div className="text-center"><div className="text-3xl font-bold text-green-400">${fmtEur(percolData.econTot)}</div><div className="text-sm text-green-600">\u00e9conomie totale</div></div>
             </div>
           </div>
         </section>`}
 
-        <footer className="mt-8 text-center text-xs text-gray-400">
+        <footer className="mt-8 text-center text-xs text-slate-600">
           Simulateur CET \u00d7 RGDU 2026 \u2014 Les deltas sont fiables, les montants absolus sont \u00e0 recaler.<br/>
           C = 0,02 + 0,3813 \u00d7 [\u00bd \u00d7 (3\u00d7SMIC\u00d7H/Brut \u2212 1)]^1,75
         </footer>
