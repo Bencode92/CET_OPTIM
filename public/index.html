@@ -539,71 +539,149 @@ function App() {
 
       {/* ═══ PERCOL (spec v2) ════════════════════════════════════════ */}
       {tab===4 && has && <div>
-        {/* Paramètres */}
-        <div style={{...S.card,...S.grid(3)}}>
-          <PBar label="% IFM vers CET" value={pctIfm} onChange={setPctIfm}/>
-          <PBar label="% ICCP vers CET" value={pctIccp} onChange={setPctIccp}/>
-          <div>
-            <div style={{fontSize:13,color:'#94a3b8',marginBottom:6}}>Forfait social : <span style={{fontWeight:700,color:'#22c55e'}}>{fSocial} %</span></div>
-            <div style={{display:'flex',gap:8}}>
-              {[16,20].map(v=><button key={v} onClick={()=>setFSocial(v)} style={S.btnSec(fSocial===v)}>{v}%{v===16?' (pilotée)':' (standard)'}</button>)}
+
+        {/* ──── 1. HEADLINE : le résultat ──────────────────────────── */}
+        <div style={{...S.card,border:'2px solid #22c55e',textAlign:'center',padding:32}}>
+          <div style={{fontSize:13,color:'#94a3b8',letterSpacing:1,textTransform:'uppercase',marginBottom:8}}>Gain annuel total — 3 étages combinés</div>
+          <div style={{fontSize:48,fontWeight:800,color:'#22c55e',lineHeight:1}}>{fmtE(percol.gainTotal)}</div>
+          <div style={{fontSize:13,color:'#64748b',marginTop:8}}>{percol.nbAdhCET} adhérents CET ({txAdhCET}%) dont {percol.nbPercol} vers PERCOL ({txChoixPERCOL}%) — taux effectif {(percol.txEffectif*100).toFixed(0)}%</div>
+          <div style={{display:'flex',justifyContent:'center',gap:32,marginTop:20}}>
+            {[
+              ['Étage 1 — RGDU',percol.gainRGDU,'#3b82f6'],
+              ['Étage 2 — Spread tréso',percol.spreadTotal,'#8b5cf6'],
+              ['Étage 3 — PERCOL net',percol.gainNetEtage3,'#22c55e'],
+            ].map(([l,v,c])=>(
+              <div key={l} style={{textAlign:'center'}}>
+                <div style={{fontSize:11,color:'#64748b'}}>{l}</div>
+                <div style={{fontSize:20,fontWeight:700,color:c,marginTop:2}}>{fmtE(v)}</div>
+                <div style={{fontSize:10,color:'#475569'}}>{percol.gainTotal>0?(v/percol.gainTotal*100).toFixed(0)+'%':'—'}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ──── 2. TIMELINE VISUELLE ───────────────────────────────── */}
+        <div style={{...S.card,padding:0,overflow:'hidden'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr'}}>
+            {/* Étage 1 */}
+            <div style={{padding:20,borderRight:'1px solid #1e293b'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:'#1d4ed8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'#fff'}}>1</div>
+                <div><div style={{fontSize:14,fontWeight:600,color:'#fff'}}>Entrée CET</div><div style={{fontSize:10,color:'#64748b'}}>Mois N</div></div>
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+                <div>{percol.nbAdhCET} intérimaires mettent {pctIfm}% IFM + {pctIccp}% ICCP en CET</div>
+                <div style={{marginTop:8}}><span style={{color:'#60a5fa',fontWeight:600}}>{fmtE(percol.cetMensuelAjuste)}</span> /mois collectés</div>
+                <div style={{color:'#60a5fa',fontWeight:600}}>{fmtE(percol.cetAnnuelAjuste)} /an</div>
+                <div style={{marginTop:8,padding:'6px 10px',background:'#172554',borderRadius:6,fontSize:11}}>
+                  Brut mensuel réduit → <span style={{color:'#3b82f6',fontWeight:600}}>gain RGDU {fmtE(percol.gainRGDU)}/an</span>
+                </div>
+              </div>
+            </div>
+            {/* Étage 2 */}
+            <div style={{padding:20,borderRight:'1px solid #1e293b'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:'#6d28d9',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'#fff'}}>2</div>
+                <div><div style={{fontSize:14,fontWeight:600,color:'#fff'}}>Détention 12 mois</div><div style={{fontSize:10,color:'#64748b'}}>Mois N → N+12</div></div>
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+                <div>ETT place le cash à <span style={{color:'#a78bfa',fontWeight:600}}>{txEtt}%</span></div>
+                <div>Verse au salarié <span style={{color:'#a78bfa',fontWeight:600}}>{txSalarie}%</span></div>
+                <div style={{marginTop:8}}><span style={{color:'#a78bfa'}}>Gains placement :</span> <span style={{fontWeight:600,color:'#fff'}}>{fmtE(percol.gainPlacP + percol.gainPlacC)}</span></div>
+                <div><span style={{color:'#a78bfa'}}>Rendement versé :</span> <span style={{fontWeight:600,color:'#fff'}}>−{fmtE(percol.rendVerseP + percol.rendVerseC)}</span></div>
+                <div style={{marginTop:8,padding:'6px 10px',background:'#2e1065',borderRadius:6,fontSize:11}}>
+                  Spread net → <span style={{color:'#8b5cf6',fontWeight:600}}>{fmtE(percol.spreadTotal)}/an</span>
+                </div>
+              </div>
+            </div>
+            {/* Étage 3 */}
+            <div style={{padding:20}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:'#15803d',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'#fff'}}>3</div>
+                <div><div style={{fontSize:14,fontWeight:600,color:'#fff'}}>Sortie</div><div style={{fontSize:10,color:'#64748b'}}>Mois N+12</div></div>
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+                <div style={{display:'flex',gap:12,marginBottom:8}}>
+                  <div style={{flex:1,padding:8,background:'#172554',borderRadius:6,textAlign:'center'}}>
+                    <div style={{fontSize:10,color:'#fbbf24'}}>→ Cash ({percol.nbCash} pers.)</div>
+                    <div style={{fontSize:10}}>48% cotisations</div>
+                    <div style={{color:'#f87171',fontWeight:600,fontSize:12}}>surcoût {fmtE(percol.surcoutCash)}</div>
+                  </div>
+                  <div style={{flex:1,padding:8,background:'#052e16',borderRadius:6,textAlign:'center'}}>
+                    <div style={{fontSize:10,color:'#22c55e'}}>→ PERCOL ({percol.nbPercol} pers.)</div>
+                    <div style={{fontSize:10}}>{fSocial}% forfait social</div>
+                    <div style={{color:'#22c55e',fontWeight:600,fontSize:12}}>économie {fmtE(percol.econPERCOL)}</div>
+                  </div>
+                </div>
+                <div style={{padding:'6px 10px',background:'#052e16',borderRadius:6,fontSize:11}}>
+                  Net étage 3 → <span style={{color:'#22c55e',fontWeight:600}}>{fmtE(percol.gainNetEtage3)}/an</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <div style={{...S.card,...S.grid(4)}}>
-          <PBar label="% intérimaires adhèrent CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
-          <PBar label="% adhérents CET → PERCOL" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
-          <PBar label="Rendement versé salarié" value={txSalarie} onChange={setTxSalarie} min={1} max={8} step={0.1}/>
-          <PBar label="Rendement placement ETT" value={txEtt} onChange={setTxEtt} min={1} max={8} step={0.1}/>
-        </div>
 
-        {/* KPI résumé */}
-        <div style={{...S.grid(5),marginBottom:20}}>
-          <div style={S.kpi('#8b5cf6')}><div style={S.kpiLabel}>Adhérents CET</div><div style={S.kpiVal}>{percol.nbAdhCET} <span style={{fontSize:13,color:'#94a3b8'}}>({txAdhCET}%)</span></div></div>
-          <div style={S.kpi('#22c55e')}><div style={S.kpiLabel}>Choix PERCOL</div><div style={S.kpiVal}>{percol.nbPercol} <span style={{fontSize:13,color:'#94a3b8'}}>({txChoixPERCOL}%)</span></div></div>
-          <div style={S.kpi('#fbbf24')}><div style={S.kpiLabel}>Choix Cash</div><div style={S.kpiVal}>{percol.nbCash}</div></div>
-          <div style={S.kpi('#3b82f6')}><div style={S.kpiLabel}>Taux effectif PERCOL</div><div style={S.kpiVal}>{(percol.txEffectif*100).toFixed(0)}%</div></div>
-          <div style={S.kpi('#f59e0b')}><div style={S.kpiLabel}>Spread</div><div style={S.kpiVal}>{(txEtt-txSalarie).toFixed(1)}%</div></div>
-        </div>
-
-        {/* Tableau de flux euro par euro */}
+        {/* ──── 3. PARAMÈTRES (compact) ────────────────────────────── */}
         <div style={S.card}>
-          <div style={{fontWeight:600,fontSize:16,color:'#fff',marginBottom:16}}>Flux euro par euro — Comparaison par pool</div>
+          <div style={{fontWeight:600,color:'#fff',marginBottom:12,fontSize:14}}>Paramètres</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr 1fr',gap:12}}>
+            <PBar label="IFM → CET" value={pctIfm} onChange={setPctIfm}/>
+            <PBar label="ICCP → CET" value={pctIccp} onChange={setPctIccp}/>
+            <PBar label="Adhésion CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
+            <PBar label="Choix PERCOL" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
+            <PBar label="Rend. salarié" value={txSalarie} onChange={setTxSalarie} min={1} max={8} step={0.1}/>
+            <PBar label="Rend. placement" value={txEtt} onChange={setTxEtt} min={1} max={8} step={0.1}/>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:12,alignItems:'center'}}>
+            <span style={{fontSize:13,color:'#94a3b8'}}>Forfait social :</span>
+            {[16,20].map(v=><button key={v} onClick={()=>setFSocial(v)} style={S.btnSec(fSocial===v)}>{v}%{v===16?' (pilotée)':''}</button>)}
+          </div>
+        </div>
+
+        {/* ──── 4. FLUX DÉTAILLÉ ───────────────────────────────────── */}
+        <div style={S.card}>
+          <div style={{fontWeight:600,fontSize:14,color:'#fff',marginBottom:16}}>Détail des flux euro par euro (annuel)</div>
           <table style={{...S.table,fontSize:13}}>
             <thead><tr>
               <th style={S.th}/>
-              <th style={{...S.th,...S.tdR,color:'#94a3b8'}}>Sans CET<br/><span style={{fontSize:10,fontWeight:400}}>(référence, {percol.nbCash} pers.)</span></th>
-              <th style={{...S.th,...S.tdR,color:'#fbbf24'}}>CET → Cash<br/><span style={{fontSize:10,fontWeight:400}}>({percol.nbCash} pers.)</span></th>
-              <th style={{...S.th,...S.tdR,color:'#22c55e'}}>CET → PERCOL<br/><span style={{fontSize:10,fontWeight:400}}>({percol.nbPercol} pers.)</span></th>
+              <th style={{...S.th,...S.tdR,color:'#94a3b8'}}>Référence<br/><span style={{fontSize:10,fontWeight:400}}>sans CET</span></th>
+              <th style={{...S.th,...S.tdR,color:'#fbbf24'}}>CET → Cash<br/><span style={{fontSize:10,fontWeight:400}}>{percol.nbCash} pers.</span></th>
+              <th style={{...S.th,...S.tdR,color:'#22c55e'}}>CET → PERCOL<br/><span style={{fontSize:10,fontWeight:400}}>{percol.nbPercol} pers.</span></th>
             </tr></thead>
             <tbody>
               {[
-                ['Principal annuel', percol.poolC, percol.poolC, percol.poolP, false],
-                ['Rendement CET versé ('+txSalarie+'%)', 0, percol.rendVerseC, percol.rendVerseP, false],
-                ['Gains placement ETT ('+txEtt+'%)', 0, -percol.gainPlacC, -percol.gainPlacP, true],
-                ['Cotisations patronales (48%)', percol.coutCashRefC, percol.cotisPayeC, 0, false],
-                ['Forfait social ('+fSocial+'%)', 0, 0, percol.forfaitPaye, false],
-                ['COÛT ADDITIONNEL EMPLOYEUR', percol.coutCashRefC, percol.coutCETCash, percol.coutPERCOL, false, true],
-                ['Économie vs référence', 0, -percol.surcoutCash, percol.econPERCOL, false, false, true],
-              ].map(([label, v1, v2, v3, isGain, isBold, isResult]) => (
-                <tr key={label} style={{borderBottom:isBold?'2px solid #334155':'1px solid #1e293b',background:isBold?'#0f172a':'transparent'}}>
-                  <td style={{padding:'8px 0',color:'#94a3b8',fontWeight:isBold?700:400,fontSize:isGain?11:13}}>{label}{isGain && <span style={{fontSize:10,color:'#475569'}}> (gain ETT)</span>}</td>
-                  {[v1,v2,v3].map((v,i) => (
-                    <td key={i} style={{...S.tdR,padding:'8px 0',fontFamily:'monospace',fontWeight:isBold||isResult?700:400,
-                      color:isResult?(v>0?'#22c55e':v<0?'#f87171':'#94a3b8'):(isGain&&v<0?'#22c55e':isBold?'#fff':'#e2e8f0')}}>{
-                      v===0&&!isBold&&!isResult ? '—' : fmtE(v)
-                    }</td>
-                  ))}
+                ['Principal annuel', percol.poolC, percol.poolC, percol.poolP],
+                ['Rendement versé ('+txSalarie+'%)', 0, percol.rendVerseC, percol.rendVerseP],
+                ['Gains placement ETT ('+txEtt+'%)', 0, -percol.gainPlacC, -percol.gainPlacP, 'gain'],
+                ['Cotisations patronales (48%)', percol.coutCashRefC, percol.cotisPayeC, 0],
+                ['Forfait social ('+fSocial+'%)', 0, 0, percol.forfaitPaye],
+              ].map(([label,v1,v2,v3,flag])=>(
+                <tr key={label} style={{borderBottom:'1px solid #1e293b'}}>
+                  <td style={{padding:'6px 0',color:'#94a3b8',fontSize:flag==='gain'?11:13}}>{label}</td>
+                  {[v1,v2,v3].map((v,i)=><td key={i} style={{...S.tdR,padding:'6px 0',fontFamily:'monospace',color:flag==='gain'&&v<0?'#22c55e':'#e2e8f0'}}>{v===0?'—':fmtE(v)}</td>)}
                 </tr>
               ))}
+              <tr style={{borderTop:'2px solid #334155',background:'#0f172a'}}>
+                <td style={{padding:'10px 0',color:'#fff',fontWeight:700}}>Coût additionnel employeur</td>
+                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#fff'}}>{fmtE(percol.coutCashRefC)}</td>
+                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#fbbf24'}}>{fmtE(percol.coutCETCash)}</td>
+                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#22c55e'}}>{fmtE(percol.coutPERCOL)}</td>
+              </tr>
+              <tr style={{borderTop:'1px solid #334155'}}>
+                <td style={{padding:'10px 0',color:'#fff',fontWeight:700}}>Économie vs référence</td>
+                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',color:'#475569'}}>ref.</td>
+                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#f87171'}}>{fmtE(-percol.surcoutCash)}<br/><span style={{fontSize:10,fontWeight:400}}>surcoût</span></td>
+                <td style={{...S.tdR,padding:'10px 0',fontFamily:'monospace',fontWeight:700,color:'#22c55e'}}>+{fmtE(percol.econPERCOL)}<br/><span style={{fontSize:10,fontWeight:400}}>économie</span></td>
+              </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Sensibilité rendement */}
+        {/* ──── 5. SENSIBILITÉ ─────────────────────────────────────── */}
         <div style={S.card}>
-          <div style={{fontWeight:600,color:'#fff',marginBottom:16}}>Sensibilité au rendement CET (choix PERCOL fixe à {txChoixPERCOL}%)</div>
-          <ResponsiveContainer width="100%" height={300}>
+          <div style={{fontWeight:600,color:'#fff',marginBottom:4,fontSize:14}}>Sensibilité au rendement CET</div>
+          <div style={{fontSize:11,color:'#64748b',marginBottom:16}}>Choix PERCOL fixe à {txChoixPERCOL}% — Plus le rendement est élevé, plus le surcoût cash augmente mais plus l'adhésion potentielle est forte</div>
+          <ResponsiveContainer width="100%" height={280}>
             <LineChart data={percol.sensData}><CartesianGrid stroke="#1e293b"/>
               <XAxis dataKey="rend" stroke="#64748b"/><YAxis stroke="#64748b" tickFormatter={v=>(v/1000).toFixed(0)+'k€'}/>
               <Tooltip formatter={v=>fmtE(v)} contentStyle={{background:'#1e293b',border:'none',borderRadius:8,color:'#fff'}}/>
@@ -611,43 +689,9 @@ function App() {
               <Line type="monotone" dataKey="g30" name="Adhésion 30%" stroke="#3b82f6" strokeWidth={2} dot={{r:3}}/>
               <Line type="monotone" dataKey="g50" name="Adhésion 50%" stroke="#22c55e" strokeWidth={2} dot={{r:3}}/>
               <Line type="monotone" dataKey="g70" name="Adhésion 70%" stroke="#fbbf24" strokeWidth={2} dot={{r:3}}/>
+              <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3"/>
             </LineChart>
           </ResponsiveContainer>
-        </div>
-
-        {/* Vue combinée 3 étages */}
-        <div style={{...S.card,border:'2px solid #22c55e'}}>
-          <div style={{fontWeight:700,color:'#22c55e',fontSize:18,marginBottom:16}}>Récap 3 étages — {percol.nbAdhCET} adhérents CET, {percol.nbPercol} choix PERCOL</div>
-          <table style={{...S.table,fontSize:14}}>
-            <thead><tr>
-              <th style={{...S.th,fontSize:14}}>Étage</th>
-              <th style={{...S.th,...S.tdR,fontSize:14}}>Gain annuel</th>
-              <th style={{...S.th,...S.tdR,fontSize:14}}>% du total</th>
-            </tr></thead>
-            <tbody>
-              {[
-                ['1 — Gain RGDU', percol.gainRGDU, '#3b82f6', 'Ajusté au '+txAdhCET+'% d\'adhésion CET ('+percol.nbAdhCET+' sal.)'],
-                ['2 — Spread trésorerie', percol.spreadTotal, '#8b5cf6', (txEtt-txSalarie).toFixed(1)+'% sur '+fmtE(percol.cetAnnuelAjuste)+' CET annuel'],
-                ['3 — PERCOL net', percol.gainNetEtage3, '#22c55e', 'Économie '+fmtE(percol.econPERCOL)+' − surcoût cash '+fmtE(percol.surcoutCash)],
-              ].map(([label, val, color, detail]) => (
-                <tr key={label} style={{borderBottom:'1px solid #1e293b'}}>
-                  <td style={{padding:'12px 0'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <div style={{width:12,height:12,borderRadius:3,background:color,flexShrink:0}}/>
-                      <div><div style={{color:'#fff',fontWeight:600}}>{label}</div><div style={{fontSize:11,color:'#64748b'}}>{detail}</div></div>
-                    </div>
-                  </td>
-                  <td style={{...S.tdR,padding:'12px 0',fontFamily:'monospace',fontSize:16,fontWeight:700,color}}>{fmtE(val)}</td>
-                  <td style={{...S.tdR,padding:'12px 0',fontFamily:'monospace',color:'#94a3b8'}}>{percol.gainTotal>0?(val/percol.gainTotal*100).toFixed(1)+'%':'—'}</td>
-                </tr>
-              ))}
-              <tr style={{borderTop:'2px solid #22c55e'}}>
-                <td style={{padding:'14px 0'}}><div style={{color:'#22c55e',fontWeight:700,fontSize:16}}>TOTAL ANNUEL</div></td>
-                <td style={{...S.tdR,padding:'14px 0',fontFamily:'monospace',fontSize:22,fontWeight:700,color:'#22c55e'}}>{fmtE(percol.gainTotal)}</td>
-                <td style={{...S.tdR,padding:'14px 0',fontFamily:'monospace',color:'#22c55e',fontWeight:700}}>100%</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>}
 
