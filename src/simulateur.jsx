@@ -45,14 +45,35 @@ function computeRow(row, pctIfm, pctIccp) {
   return { ...row, cetIfm, cetIccp, cetTotal, brutCet, redBase, redCet, gain };
 }
 
+// ─── French CSV Parser (semicolon delimiter, comma decimal) ─────────────────
+function parseCSVFrench(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const firstLine = text.split(/\r?\n/)[0];
+  const delimiter = firstLine.includes(';') ? ';' : ',';
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const headers = lines[0].split(delimiter).map((h) => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(delimiter);
+    const row = {};
+    headers.forEach((h, j) => {
+      let val = (values[j] || '').trim();
+      const numVal = val.replace(',', '.');
+      const parsed = parseFloat(numVal);
+      row[h] = !isNaN(parsed) && val !== '' ? parsed : val;
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
 // ─── CSV/XLSX Parser ────────────────────────────────────────────────────────
 function parseFileData(arrayBuffer, fileName) {
   const ext = fileName.split('.').pop().toLowerCase();
   let rows;
   if (ext === 'csv') {
     const text = new TextDecoder('utf-8').decode(arrayBuffer);
-    const wb = XLSX.read(text, { type: 'string' });
-    rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    rows = parseCSVFrench(text);
   } else {
     const wb = XLSX.read(arrayBuffer, { type: 'array' });
     rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);

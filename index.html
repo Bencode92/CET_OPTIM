@@ -78,8 +78,26 @@
 
     // ─── Parser ───────────────────────────────────────────────────────
     function parseCSVString(text){
-      var wb=XLSX.read(text,{type:'string'});
-      return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      // Strip BOM
+      if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+      // Detect delimiter
+      var firstLine=text.split(/\r?\n/)[0];
+      var delim=firstLine.includes(';')?';':',';
+      var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+      var headers=lines[0].split(delim).map(function(h){return h.trim();});
+      var rows=[];
+      for(var i=1;i<lines.length;i++){
+        var values=lines[i].split(delim);
+        var row={};
+        headers.forEach(function(h,j){
+          var val=(values[j]||'').trim();
+          var numVal=val.replace(',','.');
+          var parsed=parseFloat(numVal);
+          row[h]=!isNaN(parsed)&&val!==''?parsed:val;
+        });
+        rows.push(row);
+      }
+      return rows;
     }
     function parseFileData(buf,name){
       var ext=name.split('.').pop().toLowerCase(),rows;
