@@ -246,15 +246,15 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [rawCsv, setRawCsv] = useState('');
   const [pctIfm, setPctIfm] = useState(30);
-  const [pctIccp, setPctIccp] = useState(30);
+  const [pctIccp, setPctIccp] = useState(100);  // 100% du plafond 10 jours
   const [effectif, setEffectif] = useState(656);
-  const [fSocial, setFSocial] = useState(16);
+  const [fSocial, setFSocial] = useState(20);   // prudent : 20% par défaut
   const [txSalarie, setTxSalarie] = useState(2.9);
   const [txEtt, setTxEtt] = useState(3.2);
-  const [txAdhCET, setTxAdhCET] = useState(50);
-  const [txChoixPERCOL, setTxChoixPERCOL] = useState(40);
+  const [txAdhCET, setTxAdhCET] = useState(40);  // conservateur
+  const [txChoixPERCOL, setTxChoixPERCOL] = useState(15); // réaliste intérim
   const [coutMiseEnPlace, setCoutMiseEnPlace] = useState(50000);
-  const [pctEligible, setPctEligible] = useState(70);
+  const [pctEligible, setPctEligible] = useState(60);  // conservateur
 
   // Auto-load from GitHub
   useEffect(() => {
