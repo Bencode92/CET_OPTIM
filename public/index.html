@@ -322,12 +322,11 @@ function App() {
     const plafondPERCOL = 10 * valeurJour; // per year per worker
 
     // Average CET per worker from file (monthly)
-    const cetMoyMoisBrut = tot.n > 0 ? tot.cet / tot.n : 0;
-    // Split into IFM (unlimited) and ICCP (capped at plafondICCPEntree/12 per month)
+    // IFM : pctIfm% de l'IFM totale (pas de plafond)
     const ifmMoy = tot.n > 0 ? tot.ifm * (pctIfm/100) / tot.n : 0;
-    const iccpMoy = tot.n > 0 ? tot.iccp * (pctIccp/100) / tot.n : 0;
-    const iccpMoyCapped = Math.min(iccpMoy, plafondICCPEntree / 12);
-    const cetMoyMois = ifmMoy + iccpMoyCapped;
+    // ICCP : pctIccp% du PLAFOND 10 jours (pas de l'ICCP totale)
+    const iccpCetMois = (plafondICCPEntree * (pctIccp/100)) / 12;
+    const cetMoyMois = ifmMoy + iccpCetMois;
 
     // Pool CET adjusted by number of CET adherents
     const cetMensuelAjuste = cetMoyMois * nbAdhCET;
@@ -398,7 +397,7 @@ function App() {
       const na = Math.round(ne * pa), np = Math.round(na * pp);
       const vj = tauxHoraireCalc * 7, plP = 10 * vj;
       const ifmW = tot.n>0 ? tot.ifm*(pctIfm/100)/tot.n : 0;
-      const iccpW = tot.n>0 ? Math.min(tot.iccp*(pctIccp/100)/tot.n, 10*vj/12) : 0;
+      const iccpW = (10*vj*(pctIccp/100))/12; // % du plafond 10 jours
       const cetW = (ifmW + iccpW) * 12;
       const ca = cetW * na;
       const g1 = tot.gain * pa * 12;
@@ -482,7 +481,7 @@ function App() {
       {tab===1 && has && <div>
         <div style={{...S.card,...S.grid(3)}}>
           <PBar label="% IFM vers CET" value={pctIfm} onChange={setPctIfm}/>
-          <PBar label="% ICCP vers CET" value={pctIccp} onChange={setPctIccp}/>
+          <PBar label="ICCP → CET (% du plafond 10j)" value={pctIccp} onChange={setPctIccp}/>
           <NumInput label="Effectif total" value={effectif} onChange={setEffectif}/>
         </div>
         <div style={{...S.grid(5),marginBottom:20}}>
@@ -762,7 +761,7 @@ function App() {
                 <div><div style={{fontSize:14,fontWeight:600,color:'#fff'}}>Entrée CET</div><div style={{fontSize:10,color:'#64748b'}}>Mois N</div></div>
               </div>
               <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
-                <div>{percol.nbAdhCET} intérimaires mettent {pctIfm}% IFM + {pctIccp}% ICCP en CET</div>
+                <div>{percol.nbAdhCET} intérimaires mettent {pctIfm}% IFM + {pctIccp}% du plafond ICCP (10j) en CET</div>
                 <div style={{marginTop:8}}><span style={{color:'#60a5fa',fontWeight:600}}>{fmtE(percol.cetMensuelAjuste)}</span> /mois collectés</div>
                 <div style={{color:'#60a5fa',fontWeight:600}}>{fmtE(percol.cetAnnuelAjuste)} /an</div>
                 <div style={{marginTop:8,padding:'6px 10px',background:'#172554',borderRadius:6,fontSize:11}}>
@@ -818,7 +817,7 @@ function App() {
           <div style={{fontWeight:600,color:'#fff',marginBottom:12,fontSize:14}}>Paramètres</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr 1fr',gap:12}}>
             <PBar label="IFM → CET" value={pctIfm} onChange={setPctIfm}/>
-            <PBar label="ICCP → CET" value={pctIccp} onChange={setPctIccp}/>
+            <PBar label="ICCP → CET (% plafond 10j)" value={pctIccp} onChange={setPctIccp}/>
             <PBar label="Adhésion CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
             <PBar label="Choix PERCOL" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
             <PBar label="Rend. salarié" value={txSalarie} onChange={setTxSalarie} min={1} max={8} step={0.1}/>
