@@ -316,17 +316,16 @@ function App() {
     const nbPercol = Math.round(nbAdhCET * pChoixP);
     const nbCash = nbAdhCET - nbPercol;
 
-    // Valeur jour and plafonds
+    // Valeur jour et plafond PERCOL sortie (pas de plafond à l'entrée CET — avocat confirmé)
     const valeurJour = tauxHoraireCalc * 7;
-    const plafondICCPEntree = 10 * valeurJour; // per year per worker
-    const plafondPERCOL = 10 * valeurJour; // per year per worker
+    const plafondPERCOL = 10 * valeurJour; // 10 jours × 7h × taux = exonération max sortie PERCOL
 
     // Average CET per worker from file (monthly)
-    // IFM : pctIfm% de l'IFM totale (pas de plafond)
+    // IFM : pctIfm% de l'IFM totale (pas de plafond — avocat confirmé)
     const ifmMoy = tot.n > 0 ? tot.ifm * (pctIfm/100) / tot.n : 0;
-    // ICCP : pctIccp% du PLAFOND 10 jours (pas de l'ICCP totale)
-    const iccpCetMois = (plafondICCPEntree * (pctIccp/100)) / 12;
-    const cetMoyMois = ifmMoy + iccpCetMois;
+    // ICCP : pctIccp% de l'ICCP totale (pas de plafond entrée — avocat confirmé, 10j inopérant intérimaires)
+    const iccpMoy = tot.n > 0 ? tot.iccp * (pctIccp/100) / tot.n : 0;
+    const cetMoyMois = ifmMoy + iccpMoy;
 
     // Pool CET adjusted by number of CET adherents
     const cetMensuelAjuste = cetMoyMois * nbAdhCET;
@@ -397,7 +396,7 @@ function App() {
       const na = Math.round(ne * pa), np = Math.round(na * pp);
       const vj = tauxHoraireCalc * 7, plP = 10 * vj;
       const ifmW = tot.n>0 ? tot.ifm*(pctIfm/100)/tot.n : 0;
-      const iccpW = (10*vj*(pctIccp/100))/12; // % du plafond 10 jours
+      const iccpW = tot.n>0 ? tot.iccp*(pctIccp/100)/tot.n : 0; // pas de plafond entrée
       const cetW = (ifmW + iccpW) * 12;
       const ca = cetW * na;
       const g1 = tot.gain * pa * 12;
@@ -428,7 +427,7 @@ function App() {
       gainPlacC, rendVerseC, cotisPayeC, coutCETCash, coutCashRefC, surcoutCash,
       gainNetEtage3, gainNetEtage3AvecFS, econE3SansFS, econE3AvecFS,
       gainRGDU, spreadTotal, spreadReel, gainTotal, gainTotalPrudent,
-      valeurJour, plafondPERCOL, plafondICCPEntree, tauxCotisSSEvitees,
+      valeurJour, plafondPERCOL, tauxCotisSSEvitees,
       perWorker, leviers, impacts,
     };
   }, [tot,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp]);
@@ -481,7 +480,7 @@ function App() {
       {tab===1 && has && <div>
         <div style={{...S.card,...S.grid(3)}}>
           <PBar label="% IFM vers CET" value={pctIfm} onChange={setPctIfm}/>
-          <PBar label="ICCP → CET (% du plafond 10j)" value={pctIccp} onChange={setPctIccp}/>
+          <PBar label="% ICCP vers CET" value={pctIccp} onChange={setPctIccp}/>
           <NumInput label="Effectif total" value={effectif} onChange={setEffectif}/>
         </div>
         <div style={{...S.grid(5),marginBottom:20}}>
@@ -676,7 +675,7 @@ function App() {
             <PBar label="Participants au CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
             <PBar label="Choix plan retraite" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
           </div>
-          <div style={{marginTop:12,fontSize:11,color:'#64748b'}}>Taux horaire base : <strong style={{color:'#fff'}}>{tauxHoraireCalc.toFixed(2)} €/h</strong> (calculé depuis les données) → plafond PERCOL : <strong style={{color:'#22c55e'}}>{fmtE(percol.plafondPERCOL)}/an/salarié</strong></div>
+          <div style={{marginTop:12,fontSize:11,color:'#64748b'}}>Entrée CET : IFM + ICCP sans plafond. Sortie PERCOL exonérée : 10j × 7h × {tauxHoraireCalc.toFixed(0)} €/h = <strong style={{color:'#22c55e'}}>{fmtE(percol.plafondPERCOL)}/an/salarié</strong>. Au-delà : cotisations classiques.</div>
         </div>
 
         {/* S6: ROI */}
@@ -722,8 +721,8 @@ function App() {
 
         {/* Warning 1 mois + plafonds */}
         <div style={{padding:14,background:'#1c1107',border:'1px solid #854d0e',borderRadius:12,marginBottom:20,fontSize:12,color:'#fbbf24',lineHeight:1.6}}>
-          <strong>Données sur 1 mois</strong> — Le plafond ICCP (10 jours-équivalent/an) est simulé au prorata mensuel.<br/>
-          Taux horaire base calculé : <strong>{tauxHoraireCalc.toFixed(2)} €/h</strong> (brut base / heures, art. 6-3-2 accord 2000) → 1 jour = {(tauxHoraireCalc*7).toFixed(0)} € → plafond ICCP = {fmtE(percol.plafondICCPEntree)}/an ({fmtE2(percol.plafondICCPEntree/12)}/mois). Plafond PERCOL sortie = {fmtE(percol.plafondPERCOL)}/an par salarié.
+          <strong>Données sur 1 mois</strong> — Pas de plafond à l'entrée CET (IFM + ICCP illimitées — avocat confirmé : plafond 10j inopérant pour intérimaires).<br/>
+          Taux horaire base : <strong>{tauxHoraireCalc.toFixed(2)} €/h</strong> → 1 jour = {(tauxHoraireCalc*7).toFixed(0)} € → <strong>Plafond exonération PERCOL sortie = {fmtE(percol.plafondPERCOL)}/an</strong> par salarié (10j × 7h × taux). Au-delà : cotisations classiques.
         </div>
 
         {/* Slider éligibilité */}
@@ -761,7 +760,7 @@ function App() {
                 <div><div style={{fontSize:14,fontWeight:600,color:'#fff'}}>Entrée CET</div><div style={{fontSize:10,color:'#64748b'}}>Mois N</div></div>
               </div>
               <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
-                <div>{percol.nbAdhCET} intérimaires mettent {pctIfm}% IFM + {pctIccp}% du plafond ICCP (10j) en CET</div>
+                <div>{percol.nbAdhCET} intérimaires mettent {pctIfm}% IFM + {pctIccp}% ICCP en CET</div>
                 <div style={{marginTop:8}}><span style={{color:'#60a5fa',fontWeight:600}}>{fmtE(percol.cetMensuelAjuste)}</span> /mois collectés</div>
                 <div style={{color:'#60a5fa',fontWeight:600}}>{fmtE(percol.cetAnnuelAjuste)} /an</div>
                 <div style={{marginTop:8,padding:'6px 10px',background:'#172554',borderRadius:6,fontSize:11}}>
@@ -817,7 +816,7 @@ function App() {
           <div style={{fontWeight:600,color:'#fff',marginBottom:12,fontSize:14}}>Paramètres</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr 1fr',gap:12}}>
             <PBar label="IFM → CET" value={pctIfm} onChange={setPctIfm}/>
-            <PBar label="ICCP → CET (% plafond 10j)" value={pctIccp} onChange={setPctIccp}/>
+            <PBar label="% ICCP vers CET" value={pctIccp} onChange={setPctIccp}/>
             <PBar label="Adhésion CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
             <PBar label="Choix PERCOL" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
             <PBar label="Rend. salarié" value={txSalarie} onChange={setTxSalarie} min={1} max={8} step={0.1}/>
