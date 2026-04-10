@@ -245,16 +245,16 @@ function App() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [rawCsv, setRawCsv] = useState('');
-  const [pctIfm, setPctIfm] = useState(30);
-  const [pctIccp, setPctIccp] = useState(100);  // 100% du plafond 10 jours
+  const [pctIfm, setPctIfm] = useState(100);   // 100% IFM (comme PLD, pas de plafond)
+  const [pctIccp, setPctIccp] = useState(100); // 100% ICCP (pas de plafond entrée — avocat)
   const [effectif, setEffectif] = useState(656);
-  const [fSocial, setFSocial] = useState(20);   // prudent : 20% par défaut
+  const [fSocial, setFSocial] = useState(20);  // prudent : 20% tant que 16% pas confirmé
   const [txSalarie, setTxSalarie] = useState(2.9);
   const [txEtt, setTxEtt] = useState(3.2);
-  const [txAdhCET, setTxAdhCET] = useState(40);  // conservateur
-  const [txChoixPERCOL, setTxChoixPERCOL] = useState(15); // réaliste intérim
+  const [txAdhCET, setTxAdhCET] = useState(50);  // population âgée = plus encline à épargner
+  const [txChoixPERCOL, setTxChoixPERCOL] = useState(30); // seniors proches retraite = PERCOL attractif
   const [coutMiseEnPlace, setCoutMiseEnPlace] = useState(50000);
-  const [pctEligible, setPctEligible] = useState(60);  // conservateur
+  const [pctEligible, setPctEligible] = useState(75); // population âgée = ancienneté longue
 
   // Auto-load from GitHub
   useEffect(() => {
