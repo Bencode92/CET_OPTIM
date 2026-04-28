@@ -1,7 +1,7 @@
 # Le CET et le PERCOL pour les intérimaires
-## Votre épargne salariale, expliquée simplement
+## Votre épargne salariale chez CAMÉLÉONS RH, expliquée simplement
 
-> Document destiné aux salariés intérimaires de l'agence.
+> Document destiné aux salariés intérimaires de CAMÉLÉONS RH.
 > Préparé en avril 2026 sur la base de la note juridique de notre avocat.
 
 ---
@@ -58,11 +58,11 @@ Avec le CET, vous choisissez d'en mettre **une partie en épargne** : 50 %, 100 
 
 ### Étape 2 — Votre épargne fructifie
 
-Pendant 12 mois, l'agence garde votre argent et vous **verse un intérêt**.
+Pendant 12 mois, CAMÉLÉONS RH garde votre argent et vous **verse un intérêt**.
 
-Le taux de référence proposé est par exemple **2,9 % brut annuel** — bien au-dessus du Livret A.
+Le taux de référence proposé est par exemple **3 % brut annuel** — bien au-dessus du Livret A.
 
-Sur 1 000 € épargnés, c'est **+ 29 € d'intérêt** au bout d'un an.
+Sur 1 000 € épargnés, c'est **+ 30 € d'intérêt** au bout d'un an.
 
 ### Étape 3 — Vous choisissez la suite
 
@@ -89,10 +89,10 @@ Si elle place **100 % de son IFM et de son ICCP en CET** sur l'année :
 | Élément | Montant |
 |---|---:|
 | Total placé sur 12 mois | 4 800 € |
-| Intérêts à 2,9 % | + 139 € |
+| Intérêts à 3 % | + 144 € |
 | **Solde CET fin d'année** | **4 939 €** |
 
-→ Marie a **4 939 €** disponibles pour la suite, à choisir entre cash et PERCOL.
+→ Marie a **4 944 €** disponibles pour la suite, à choisir entre cash et PERCOL.
 
 ---
 
@@ -171,7 +171,7 @@ C'est l'**article 6-3-2** de l'accord de branche : 1 jour = 7 heures, valorisé 
 
 ## Et le rendement servi pendant les 12 mois ?
 
-Pendant que votre argent est sur le CET, l'agence vous verse un intérêt (par exemple 2,9 %).
+Pendant que votre argent est sur le CET, CAMÉLÉONS RH vous verse un intérêt (par exemple 3 %).
 
 À la fin de l'année, **vous décidez** ce qu'il devient :
 
@@ -192,11 +192,11 @@ Pendant que votre argent est sur le CET, l'agence vous verse un intérêt (par e
 
 | Année | Solde CET fin d'année | Choix |
 |---|---:|---|
-| Année 1 | 1 235 € (1 200 € + 35 € d'intérêt) | Récupère en cash |
-| Année 2 | 1 235 € | Récupère en cash |
-| Année 3 | 1 235 € | … |
+| Année 1 | 1 236 € (1 200 € + 36 € d'intérêt) | Récupère en cash |
+| Année 2 | 1 236 € | Récupère en cash |
+| Année 3 | 1 236 € | … |
 
-**Bilan** : Lucas utilise le CET comme un **livret rémunéré** à 2,9 %. Il finance ses projets avec son épargne plus les intérêts.
+**Bilan** : Lucas utilise le CET comme un **livret rémunéré** à 3 %. Il finance ses projets avec son épargne plus les intérêts.
 
 → Pas de PERCOL pour Lucas. Mais le CET reste très utile.
 
@@ -211,8 +211,8 @@ Pendant que votre argent est sur le CET, l'agence vous verse un intérêt (par e
 | Année 1 | Détail |
 |---|---:|
 | Total placé | 4 320 € |
-| Intérêts CET 2,9 % | + 125 € |
-| Solde fin d'année | 4 445 € |
+| Intérêts CET 3 % | + 130 € |
+| Solde fin d'année | 4 450 € |
 
 À la fin de l'année, Sandrine **transfère en PERCOL** :
 - **Plafond exonéré** : 18 × 7 × 10 = **1 260 €/an**
@@ -235,8 +235,8 @@ Pendant que votre argent est sur le CET, l'agence vous verse un intérêt (par e
 | Élément | Montant |
 |---|---:|
 | Total placé | 4 800 € |
-| Intérêts | + 139 € |
-| **Solde CET** | **4 939 €** |
+| Intérêts | + 144 € |
+| **Solde CET** | **4 944 €** |
 | Plafond exonéré (10 × 7 × 28) | 1 960 € |
 | Part exonérée IR + cotisations | 1 960 € |
 | Part imposable | 2 979 € |
@@ -290,6 +290,36 @@ Dans ces cas, le **capital sort sans IR** (les plus-values restent taxées à 12
 
 ---
 
+## ⚠ Point d'attention important — Allocation chômage
+
+> **Depuis le 1er avril 2025** (arrêté du 19 décembre 2024), les indemnités issues du déblocage d'un CET **ne sont plus prises en compte** dans le calcul du salaire de référence pour l'allocation chômage.
+
+**Conséquence** : si vous affectez une part importante de votre IFM/ICCP au CET, votre **future allocation chômage peut être réduite**.
+
+### Notre recommandation
+
+| Profil | Stratégie suggérée |
+|---|---|
+| **Vous alternez régulièrement missions et chômage** | Limitez le % au CET (par ex. 30-50 %) pour préserver votre allocation |
+| **Vous enchaînez les missions sans interruption** | Vous pouvez maximiser le placement (jusqu'à 100 %) |
+| **Vous êtes proche de la retraite** | Le PERCOL reste très avantageux, l'effet chômage est limité |
+
+→ **Faites votre simulation personnelle** avec votre référent agence avant de décider.
+
+---
+
+## Délai de 5 ans pour utiliser votre CET
+
+Une fois que votre CET atteint l'équivalent de **22 jours**, vous avez **5 ans** pour l'utiliser (en cash, en congés, ou en transfert PERCOL).
+
+Au-delà de ce délai, les sommes vous sont **automatiquement versées sous forme d'indemnité compensatrice** — soumise aux cotisations et impôts comme un salaire.
+
+**En pratique** : ce délai concerne surtout les profils qui accumulent beaucoup et n'utilisent jamais leur CET. La plupart des intérimaires utilisent leur CET bien avant 5 ans.
+
+→ Si vous approchez du délai, votre agence vous prévient.
+
+---
+
 ## Vos droits et garanties
 
 ### Liberté de choix
@@ -299,7 +329,7 @@ Dans ces cas, le **capital sort sans IR** (les plus-values restent taxées à 12
 
 ### Garantie de l'épargne
 - Vos droits sont **acquis dès le 1er jour**
-- Le cadre juridique de l'accord de branche du 27 mars 2000 protège vos sommes même en cas de difficultés de l'agence
+- Le cadre juridique de l'accord de branche du 27 mars 2000 protège vos sommes même en cas de difficultés de CAMÉLÉONS RH
 - En cas de **départ avant 12 mois**, vous récupérez votre solde CET
 
 ### Information continue
@@ -328,10 +358,10 @@ Le taux acquis sur la période de placement reste garanti.
 
 ## FAQ — Vos 12 questions les plus fréquentes
 
-### 1. Et si je quitte l'agence avant 12 mois ?
+### 1. Et si je quitte CAMÉLÉONS RH avant 12 mois ?
 Vos droits sont acquis. À votre départ, vous récupérez votre solde CET en cash, ou pouvez le transférer vers un autre dispositif d'épargne retraite (selon votre situation).
 
-### 2. Le taux 2,9 % est-il garanti ?
+### 2. Le taux 3 % est-il garanti ?
 Le taux est annoncé pour l'année et appliqué à votre solde. Il peut évoluer pour les périodes suivantes — vous serez prévenus.
 
 ### 3. Combien puis-je placer au maximum ?
@@ -356,29 +386,39 @@ Un bulletin d'adhésion vous sera remis par votre agence. Vous y indiquerez vos 
 Vos droits sont conservés. Selon les modalités, ils peuvent être transférés sur le CET de l'entreprise d'accueil ou être versés sur votre PERCOL.
 
 ### 10. Le PERCOL est-il sécurisé ?
-Le PERCOL est géré par un organisme habilité (Amundi, Natixis, BNP, etc.) sous contrôle de l'Autorité des Marchés Financiers. Vos avoirs sont nominatifs et conservés en dehors du bilan de l'agence.
+Le PERCOL est géré par un organisme habilité (Amundi, Natixis, BNP, etc.) sous contrôle de l'Autorité des Marchés Financiers. Vos avoirs sont nominatifs et conservés en dehors du bilan de CAMÉLÉONS RH.
 
 ### 11. Puis-je sortir du PERCOL si je change de société ?
 Vous gardez votre PERCOL. Vous pouvez ne plus l'alimenter, le transférer vers un autre PERCOL si votre nouvel employeur en a un, ou le laisser fructifier jusqu'à la retraite.
 
 ### 12. Y a-t-il des frais ?
-Le CET ne coûte rien (le rendement est servi brut, l'agence prend en charge la gestion). Le PERCOL a des frais de gestion annuels du gestionnaire (typiquement 0,5 à 1 %), prélevés directement sur le fonds.
+Le CET ne coûte rien (le rendement est servi brut, CAMÉLÉONS RH prend en charge la gestion). Le PERCOL a des frais de gestion annuels du gestionnaire (typiquement 0,5 à 1 %), prélevés directement sur le fonds.
 
 ---
 
 ## Mode d'emploi pratique en 4 étapes
 
 ### Étape 1 — Je vérifie mon éligibilité
-Je demande à mon agence si j'ai bien atteint les 910 heures sur 12 mois.
+Je demande à mon agence si j'ai bien atteint les **910 heures sur les 12 derniers mois** chez CAMÉLÉONS RH.
 
-### Étape 2 — Je fais ma simulation
-Avec mon taux horaire et le pourcentage que je veux placer, je calcule ce que ça donne sur l'année.
+### Étape 2 — Je prépare mon dossier d'adhésion
+Je rassemble les **3 pièces obligatoires** :
+- ✅ Le **formulaire d'ouverture** dûment complété et signé (fourni par CAMÉLÉONS RH)
+- ✅ Une **pièce d'identité** en cours de validité
+- ✅ Un **justificatif de domicile** de moins de 3 mois
 
-### Étape 3 — Je signe le bulletin d'adhésion
-Je précise les pourcentages IFM et ICCP. C'est modifiable à chaque mission.
+### Étape 3 — Je précise mes choix sur le formulaire
+- **Pourcentage IFM** à placer : 0, 50 ou 100 % (selon les options proposées)
+- **Pourcentage ICCP** à placer : idem
+- **Modifiable à chaque renouvellement de mission**
 
 ### Étape 4 — Je suis mon CET
-Je reçois un relevé annuel. À l'approche du 12ᵉ mois, je décide : cash ou PERCOL.
+- Je reçois un **relevé annuel** au 31 décembre
+- Je peux **demander un état à tout moment** auprès de mon agence
+- À l'approche du 12ᵉ mois, je décide : **cash, congés, ou transfert PERCOL**
+
+### Pour toute question
+Contactez votre agence de référence ou le **01 56 88 09 88**.
 
 ---
 
