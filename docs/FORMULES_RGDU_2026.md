@@ -47,19 +47,23 @@ C = Tmin + Tδ × [½ × (ratio − 1)]^1,75
 C = min(C, Tmax)
 ```
 
-### Paramètres
+### Paramètres (en vigueur depuis le 1er janvier 2026)
 
-| Paramètre | FNAL 0,50% | FNAL 0,10% |
+| Paramètre | FNAL 0,50 % (>50 sal.) | FNAL 0,10 % |
 |---|---|---|
 | Tmin | 0,0200 | 0,0200 |
-| Tmax | 0,4013 | 0,3973 |
-| Tδ | 0,3813 | 0,3773 |
+| Tmax | **0,4021** | **0,3981** |
+| Tδ | **0,3821** | **0,3781** |
 | Puissance | 1,75 | 1,75 |
 
-### D'où vient Tδ (0,3813) ?
+> **Source** : Décret n° 2025-1446 du 31 décembre 2025, art. 1er, 3° b) — modifie l'article D. 241-7 du Code de la Sécurité Sociale. La valeur initialement publiée par le décret du 4 septembre 2025 (Tδ = 0,3813) a été remplacée 4 mois plus tard.
+>
+> Pour une ETT à 660 salariés (FNAL 0,50 % obligatoire) : **Tδ = 0,3821, Tmax = 0,4021**.
+
+### D'où vient Tδ ?
 
 Tδ = Tmax − Tmin = amplitude de la réduction.  
-Tmax (0,4013) = somme des cotisations patronales éligibles (maladie, vieillesse, AF, FNAL, CSA, AGIRC-ARRCO, chômage, AT/MP plafonné).  
+Tmax = somme des cotisations patronales éligibles (maladie, vieillesse, AF, FNAL, CSA, AGIRC-ARRCO, chômage, AT/MP plafonné).  
 Tmin (0,02) = plancher de la réforme 2026.
 
 ### Pourquoi puissance 1,75 ?
@@ -111,9 +115,34 @@ Réduction = 0,02937 × 3 080,95 = 90,50 €
 
 ## Écart constaté
 
-Bulletin Mourice Laure (206h, Brut 7 284,94 €) :
+### Cas extrême — Mourice Laure (206h, Brut 7 284,94 €)
 - Formule → 146 €
 - Bulletin → 33 €
 - Facteur ≈ ×4,4
 
-À investiguer. Les **deltas** restent fiables.
+### Verdict après test corrélation sur 158 lignes (28/04/2026)
+
+**La calibration multiplicative tient** (CV = 0,18, corrélations |corr| < 0,27 vs ratio, brut, taux horaire).
+
+Mais résultat clé : `k_global = 1,078` — la formule **sous-estime** la réduction réelle de **~8 %** sur la population, **pas l'inverse**. Mourice était un cas pathologique non représentatif.
+
+### Cause des cas pathologiques
+
+**Régularisation annuelle progressive** dans la paie : 24 % des lignes avec réduction > 0 sont au-dessus du seuil 3 SMIC mensuel (formule = 0) parce que le logiciel paie applique le coefficient sur la **rémunération annuelle cumulée**, pas sur le brut mensuel isolé.
+
+→ **Limite structurelle** : la formule mensuelle ne peut pas reproduire la régul annuelle. La précision individuelle est limitée sur un mois isolé. Au niveau population, l'écart se moyenne (k_global ≈ 1,08).
+
+### Secteurs DFS mission-dépendants
+
+L'arrêté du 4 septembre 2025 prévoit que la DFS s'applique **par mission**, pas par statut intérim. BTP construction = 7 % en 2026 → base RGDU réduite à 93 % du brut. Ce dispositif explique une partie de la dispersion individuelle non capturée par la formule pure.
+
+→ Recommandation : enrichir le CSV avec un code mission/secteur DFS pour appliquer la base abattue par ligne.
+
+### Calibration appliquée dans le simulateur
+
+Pour chaque salarié `i` avec `Réduction générale > 0` dans le CSV :
+- `k_i = redAct_i / formulaBase_i`
+- `redCet_i = formulaCet_i × k_i`
+- `gain_i = (formulaCet_i − formulaBase_i) × k_i`
+
+Pour les lignes sans `redAct` ou avec `formulaBase = 0` (24 % « incohérentes ») : fallback formule pure (probablement sous-estime le gain réel).

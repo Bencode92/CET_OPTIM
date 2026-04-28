@@ -27,8 +27,30 @@ const {BarChart,Bar,LineChart,Line,XAxis,YAxis,CartesianGrid,
        Tooltip,Legend,ResponsiveContainer,Cell,ReferenceLine} = Recharts;
 
 // ─── Constants ────────────────────────────────────────────────────────────
-const RGDU = {smicH:12.02, seuil:3, tMin:0.02, tMax:0.4013, tDelta:0.3813, pow:1.75};
-const COTIS = 0.48;
+// Paramètres RGDU 2026 — Décret n°2025-1446 du 31/12/2025 (modifie art. D.241-7 CSS)
+// ETT > 50 salariés → FNAL 0,50 % → Tdelta = 0,3821, Tmax = 0,4021
+const RGDU = {smicH:12.02, seuil:3, tMin:0.02, tMax:0.4021, tDelta:0.3821, pow:1.75};
+
+// Cotisations patronales ETT 2026 ventilées (sous PASS, hors RGDU)
+// AGS 0,03 % = spécificité intérim (vs ~0,15 % droit commun)
+const COTIS_ETT = {
+  // Exonérées au transfert CET → PERCOL (« assurances sociales + AF »)
+  maladie:        0.1300,  // maladie-maternité-invalidité-décès
+  af:             0.0525,  // allocations familiales
+  vieil_plaf:     0.0855,  // vieillesse plafonnée
+  vieil_deplaf:   0.0211,  // vieillesse déplafonnée
+  // Non exonérées (continuent à courir)
+  atmp:           0.0300,  // AT/MP — variable selon mission, 3% typique
+  fnal:           0.0050,  // FNAL > 50 salariés
+  csa:            0.0030,  // contribution solidarité autonomie
+  agirc_arrco:    0.0601,  // retraite complémentaire T1
+  chomage:        0.0405,
+  ags_interim:    0.0003,  // ⚠ AGS spécifique intérim (vs 0,15 % droit commun)
+  formation:      0.0130,  // formation professionnelle ETT
+  apprentissage:  0.0068,
+};
+const TX_SS_EVITEES_DEFAULT = COTIS_ETT.maladie + COTIS_ETT.af + COTIS_ETT.vieil_plaf + COTIS_ETT.vieil_deplaf; // = 0.2891
+const COTIS = Object.values(COTIS_ETT).reduce((s,x)=>s+x, 0); // ≈ 0.4478 (vs 0,48 estimation initiale)
 const PROXY = 'https://studyforge-proxy.benoit-comas.workers.dev';
 const GH_PATH = 'Bencode92/CET_OPTIM/contents/data/historique/latest_marges.csv';
 const TABS = ['Données','Détail salariés','Graphiques','Vue d\'ensemble','Détail expert','Méthodologie'];
@@ -273,6 +295,7 @@ function App() {
   const [coutMiseEnPlace, setCoutMiseEnPlace] = useState(50000);
   const [pctEligible, setPctEligible] = useState(40); // donnée réelle : 40% ont 910h d'ancienneté
   const [useCalibrated, setUseCalibrated] = useState(true); // calibration RGDU sur Réduction générale réelle (CSV)
+  const [txSSEvitees, setTxSSEvitees] = useState(28.91); // % cotisations SS évitées au transfert PERCOL — 28,91 = défaut, 25 = mode prudent
 
   // Auto-load from GitHub
   useEffect(() => {
@@ -383,7 +406,9 @@ function App() {
     const spreadReel = cetAnnuelAjuste * (rE - rS);
 
     // Étage 3: SS cotisations evitees only (25%)
-    const tauxCotisSSEvitees = 0.25;
+    // Périmètre légal : « assurances sociales + allocations familiales » (transfert CET → PERCOL)
+    // Défaut 0,2891 = maladie 13% + AF 5,25% + vieillesse plafonnée 8,55% + déplafonnée 2,11%
+    const tauxCotisSSEvitees = txSSEvitees / 100;
     const poolPercolTotal = poolP; // only PERCOL workers, capped
     // Sans forfait social
     const econE3SansFS = poolPercolTotal * tauxCotisSSEvitees;
@@ -464,7 +489,7 @@ function App() {
       perWorker, leviers, impacts,
       cetAnPlafonneMoyen, cetAnExcessMoyen, pctSalariesAuPlafond,
     };
-  }, [tot,sim,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp]);
+  }, [tot,sim,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp,txSSEvitees]);
 
   const has = data.length > 0;
 
@@ -771,9 +796,26 @@ function App() {
           <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
             <strong style={{color:useCalibrated?'#22c55e':'#fbbf24'}}>{useCalibrated ? 'Mode CALIBRÉ' : 'Mode FORMULE PURE'}</strong> —{' '}
             {useCalibrated
-              ? <>{tot.nCalibrated}/{tot.n} salariés avec réduction réelle. Coefficient moyen <strong style={{color:'#3b82f6'}}>k = {tot.kMoyen.toFixed(3)}</strong> (formule × {(1/Math.max(tot.kMoyen,0.001)).toFixed(2)} → bulletin). Coefficient global <strong style={{color:'#3b82f6'}}>k = {tot.kGlobal.toFixed(3)}</strong>.</>
-              : <>Calcul pur formule. Réduction baseline totale <strong>{fmtE(tot.rB)}/mois</strong>. Réduction réelle CSV totale <strong>{fmtE(tot.redActSum)}/mois</strong> (écart × {(tot.rB/Math.max(tot.redActSum,1)).toFixed(2)}).</>
+              ? <>{tot.nCalibrated}/{tot.n} salariés avec réduction réelle. Coefficient moyen <strong style={{color:'#3b82f6'}}>k = {tot.kMoyen.toFixed(3)}</strong>. Coefficient global <strong style={{color:'#3b82f6'}}>k = {tot.kGlobal.toFixed(3)}</strong>{tot.kGlobal > 0.95 && tot.kGlobal < 1.15 ? ' (formule sous-estime de ~'+((tot.kGlobal-1)*100).toFixed(0)+'%)' : ''}.</>
+              : <>Calcul pur formule. Réduction baseline totale <strong>{fmtE(tot.rB)}/mois</strong>. Réduction réelle CSV totale <strong>{fmtE(tot.redActSum)}/mois</strong>.</>
             }
+          </div>
+          <div style={{marginTop:8,fontSize:11,color:'#fbbf24',fontStyle:'italic'}}>
+            ⚠ Limite : la formule mensuelle ne peut pas reproduire la régul annuelle de la paie. Sur un mois isolé, la précision individuelle est limitée — les chiffres population restent fiables.
+          </div>
+        </div>
+
+        {/* Cotisations SS évitées au transfert PERCOL */}
+        <div style={{padding:14,background:'#0f172a',border:'1px solid #14532d',borderRadius:12,marginBottom:20,fontSize:13,color:'#bbf7d0',lineHeight:1.6}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8,flexWrap:'wrap'}}>
+            <strong style={{color:'#fff'}}>Cotisations SS évitées au transfert PERCOL</strong>
+            <input type="number" step="0.1" min="20" max="32" value={txSSEvitees} onChange={e=>setTxSSEvitees(parseFloat(e.target.value)||0)} style={{...S.input,width:80,textAlign:'right',fontSize:13}}/>
+            <span style={{fontSize:12,color:'#86efac'}}>%</span>
+            <button onClick={()=>setTxSSEvitees(28.91)} style={{padding:'4px 10px',background:'#14532d',color:'#bbf7d0',border:'1px solid #166534',borderRadius:6,fontSize:11,cursor:'pointer'}}>Réglementaire 28,91 %</button>
+            <button onClick={()=>setTxSSEvitees(25.00)} style={{padding:'4px 10px',background:'#1c1107',color:'#fbbf24',border:'1px solid #854d0e',borderRadius:6,fontSize:11,cursor:'pointer'}}>Prudent 25 %</button>
+          </div>
+          <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+            Périmètre légal (transfert ≤ 10 j/an) : « assurances sociales + allocations familiales ». Défaut <strong style={{color:'#22c55e'}}>28,91 %</strong> = maladie 13 % + AF 5,25 % + vieillesse plafonnée 8,55 % + déplafonnée 2,11 % (sous PASS, ETT 2026). Ne sont PAS exonérés : AT/MP, FNAL, CSA, AGIRC-ARRCO, chômage, AGS (0,03 % en intérim), formation, apprentissage. Total cotisations patronales ETT : <strong>{(COTIS*100).toFixed(2)} %</strong>.
           </div>
         </div>
 
@@ -1031,11 +1073,11 @@ function App() {
           <div style={{marginBottom:20}}>
             <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:6}}>3.1 — Allègement RGDU 2026 (réduction générale dégressive uniformisée)</div>
             <div style={{padding:12,background:'#0a0f1c',borderRadius:6,fontFamily:'monospace',fontSize:12,color:'#e2e8f0',marginBottom:8}}>
-              C = 0,02 + 0,3813 × [½ × (3 × SMIC × H / Brut − 1)] ^ 1,75
+              C = 0,02 + 0,3821 × [½ × (3 × SMIC × H / Brut − 1)] ^ 1,75
             </div>
             <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
               Avec SMIC = 12,02 €/h, H = heures payées, Brut = salaire brut mensuel.<br/>
-              Coefficient de réduction C appliqué à la base de cotisations. <strong>Seuil d'extinction</strong> : 3 × SMIC. <strong>Tmax</strong> = 0,4013 (FNAL 0,50%), <strong>Tmin</strong> = 0,02. Puissance 1,75.<br/>
+              Coefficient de réduction C appliqué à la base de cotisations. <strong>Seuil d'extinction</strong> : 3 × SMIC. <strong>Tmax</strong> = 0,4021 (FNAL 0,50 %), <strong>Tmin</strong> = 0,02, <strong>Tδ</strong> = 0,3821. Puissance 1,75. <em>Source : décret n°2025-1446 du 31/12/2025 (modifie art. D.241-7 CSS) — valeurs en vigueur depuis le 1/1/2026.</em><br/>
               Gain RGDU = (réduction sur brut hors CET) − (réduction sur brut initial), positif quand le brut baisse.
             </div>
           </div>
@@ -1079,7 +1121,7 @@ function App() {
             <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:6}}>3.5 — Économie nette PERCOL (étage 3)</div>
             <div style={{padding:12,background:'#0a0f1c',borderRadius:6,fontFamily:'monospace',fontSize:12,color:'#e2e8f0',marginBottom:8}}>
               econE3 = poolPERCOL × (tauxCotisSSEvitées − forfaitSocial)<br/>
-              <span style={{color:'#94a3b8'}}>tauxCotisSSEvitées = 25 % (cotisations patronales SS hors CSG/CRDS)</span><br/>
+              <span style={{color:'#94a3b8'}}>tauxCotisSSEvitées = 28,91 % (réglementaire) — maladie 13 % + AF 5,25 % + vieillesse plafonnée 8,55 % + déplafonnée 2,11 %</span><br/>
               <span style={{color:'#94a3b8'}}>forfaitSocial = 16 % (gestion pilotée + PEA-PME) ou 20 %</span>
             </div>
           </div>
@@ -1099,10 +1141,11 @@ function App() {
             <tbody>
               <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>SMIC horaire</td><td style={{textAlign:'right',padding:'8px 12px'}}>12,02 €</td><td style={{padding:'8px 12px'}}>Valeur 2026</td></tr>
               <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Seuil extinction RGDU</td><td style={{textAlign:'right',padding:'8px 12px'}}>3 × SMIC</td><td style={{padding:'8px 12px'}}>Code SS art. L241-13</td></tr>
-              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Tmax RGDU (FNAL 0,50%)</td><td style={{textAlign:'right',padding:'8px 12px'}}>0,4013</td><td style={{padding:'8px 12px'}}>Décret 2026 RGDU</td></tr>
-              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Tmin RGDU</td><td style={{textAlign:'right',padding:'8px 12px'}}>0,02 (2%)</td><td style={{padding:'8px 12px'}}>Décret 2026 RGDU</td></tr>
-              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Cotisations patronales (full)</td><td style={{textAlign:'right',padding:'8px 12px'}}>~48 %</td><td style={{padding:'8px 12px'}}>Estimation marge intérim</td></tr>
-              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Cotisations SS évitées (transfert PERCOL)</td><td style={{textAlign:'right',padding:'8px 12px'}}>~25 %</td><td style={{padding:'8px 12px'}}>Patronales SS hors CSG/CRDS</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Tmax RGDU (FNAL 0,50 %)</td><td style={{textAlign:'right',padding:'8px 12px'}}>0,4021</td><td style={{padding:'8px 12px'}}>Décret 2025-1446 du 31/12/2025</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Tδ (Tmax − Tmin)</td><td style={{textAlign:'right',padding:'8px 12px'}}>0,3821</td><td style={{padding:'8px 12px'}}>Décret 2025-1446 (modifie D.241-7 CSS)</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Tmin RGDU</td><td style={{textAlign:'right',padding:'8px 12px'}}>0,02 (2 %)</td><td style={{padding:'8px 12px'}}>Décret 2026 RGDU</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Cotisations patronales totales ETT</td><td style={{textAlign:'right',padding:'8px 12px'}}>~44,8 %</td><td style={{padding:'8px 12px'}}>Ventilation COTIS_ETT (AGS 0,03 % spécifique intérim)</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Cotisations SS évitées (transfert PERCOL)</td><td style={{textAlign:'right',padding:'8px 12px'}}>28,91 %</td><td style={{padding:'8px 12px'}}>Maladie 13 % + AF 5,25 % + vieil. plaf 8,55 % + déplaf 2,11 %</td></tr>
               <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Forfait social PERCOL</td><td style={{textAlign:'right',padding:'8px 12px'}}>16 % ou 20 %</td><td style={{padding:'8px 12px'}}><span style={{color:'#fbbf24'}}>⚠ à confirmer gestionnaire</span></td></tr>
               <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Éligibilité (910 h / 12 mois)</td><td style={{textAlign:'right',padding:'8px 12px'}}>40 %</td><td style={{padding:'8px 12px'}}>Donnée réelle ETT, art. 6-3-1</td></tr>
               <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Adhésion CET (parmi éligibles)</td><td style={{textAlign:'right',padding:'8px 12px'}}>50 % (par défaut)</td><td style={{padding:'8px 12px'}}>Estimation, ajustable</td></tr>
@@ -1160,7 +1203,7 @@ function App() {
       </div>}
 
 
-      <div style={S.footer}>Simulateur CET × RGDU 2026 — Les deltas sont fiables, les montants absolus sont à recaler.<br/>C = 0,02 + 0,3813 × [½ × (3×SMIC×H/Brut − 1)]^1,75</div>
+      <div style={S.footer}>Simulateur CET × RGDU 2026 — Décret 2025-1446 du 31/12/2025.<br/>C = 0,02 + 0,3821 × [½ × (3×SMIC×H/Brut − 1)]^1,75 (FNAL 0,50 %, Tmax = 0,4021)</div>
     </div>
   );
 }
