@@ -165,18 +165,27 @@ function calcRgdu(hrs, brut) {
   const c = Math.min(RGDU.tMin + RGDU.tDelta * Math.pow(0.5*(ratio-1), RGDU.pow), RGDU.tMax);
   return c * brut;
 }
-function simRow(row, pi, pc) {
+function simRow(row, pi, pc, useCalibrated) {
   const ci = row.ifm*pi, cc = row.iccp*pc, ct = ci+cc;
   const bc = row.brut - ci - cc;
-  const rb = calcRgdu(row.hrs, row.brut), rc = calcRgdu(row.hrs, bc);
+  const formulaBase = calcRgdu(row.hrs, row.brut);
+  const formulaCet  = calcRgdu(row.hrs, bc);
+  // Calibration par salarié : si Réduction générale réelle dispo dans le CSV,
+  // l'utiliser comme baseline et propager k_i = redAct / formulaBase au scénario CET
+  const hasRedAct = row.redAct > 0 && formulaBase > 0;
+  const kRow = hasRedAct ? row.redAct / formulaBase : 1;
+  const calibrated = hasRedAct && useCalibrated;
+  const rb = calibrated ? row.redAct : formulaBase;
+  const rc = calibrated ? formulaCet * kRow : formulaCet;
   // Plafond CET→PERCOL par salarié : 10j × 7h × taux horaire individuel (art. 6-3-2)
-  // Taux horaire = brut hors primes / heures payées
   const tauxHoraireRow = row.hrs > 0 ? (row.brut - row.ifm - row.iccp) / row.hrs : 0;
   const plafondAnRow = 10 * 7 * tauxHoraireRow;
   const cetAnRow = ct * 12;
   const cetAnPlafonneRow = Math.min(cetAnRow, plafondAnRow);
   const cetAnExcessRow = Math.max(0, cetAnRow - plafondAnRow);
-  return {...row, cetIfm:ci, cetIccp:cc, cetTotal:ct, brutCet:bc, redBase:rb, redCet:rc, gain:rc-rb,
+  return {...row, cetIfm:ci, cetIccp:cc, cetTotal:ct, brutCet:bc,
+    redBase:rb, redCet:rc, gain:rc-rb,
+    formulaBase, formulaCet, kRow, calibrated,
     tauxHoraireRow, plafondAnRow, cetAnRow, cetAnPlafonneRow, cetAnExcessRow};
 }
 
@@ -263,6 +272,7 @@ function App() {
   const [txChoixPERCOL, setTxChoixPERCOL] = useState(30); // seniors proches retraite = PERCOL attractif
   const [coutMiseEnPlace, setCoutMiseEnPlace] = useState(50000);
   const [pctEligible, setPctEligible] = useState(40); // donnée réelle : 40% ont 910h d'ancienneté
+  const [useCalibrated, setUseCalibrated] = useState(true); // calibration RGDU sur Réduction générale réelle (CSV)
 
   // Auto-load from GitHub
   useEffect(() => {
@@ -294,17 +304,23 @@ function App() {
   }, []);
 
   // ─── Simulation ──────────────────────────────────────────────────
-  const sim = useMemo(() => data.map(r => simRow(r, pctIfm/100, pctIccp/100)), [data,pctIfm,pctIccp]);
+  const sim = useMemo(() => data.map(r => simRow(r, pctIfm/100, pctIccp/100, useCalibrated)), [data,pctIfm,pctIccp,useCalibrated]);
   const tot = useMemo(() => {
     const t = {n:sim.length, hrs:0, brut:0, brutBase:0, ifm:0, iccp:0, cet:0, rB:0, rC:0, gain:0,
-      cetAnPlafonne:0, cetAnExcess:0, plafondAn:0};
+      cetAnPlafonne:0, cetAnExcess:0, plafondAn:0,
+      formulaBaseSum:0, redActSum:0, nCalibrated:0, kSumCalibrated:0};
     sim.forEach(r => {
       t.hrs+=r.hrs; t.brut+=r.brut; t.brutBase+=(r.brut-r.ifm-r.iccp);
       t.ifm+=r.ifm; t.iccp+=r.iccp; t.cet+=r.cetTotal;
       t.rB+=r.redBase; t.rC+=r.redCet; t.gain+=r.gain;
       t.cetAnPlafonne+=r.cetAnPlafonneRow; t.cetAnExcess+=r.cetAnExcessRow;
       t.plafondAn+=r.plafondAnRow;
+      t.formulaBaseSum+=r.formulaBase;
+      t.redActSum+=(r.redAct||0);
+      if (r.calibrated) { t.nCalibrated++; t.kSumCalibrated+=r.kRow; }
     });
+    t.kMoyen = t.nCalibrated > 0 ? t.kSumCalibrated / t.nCalibrated : 1;
+    t.kGlobal = t.formulaBaseSum > 0 ? t.redActSum / t.formulaBaseSum : 1;
     return t;
   }, [sim]);
   // Taux horaire base calculé depuis les données (art. 6-3-2 : salaire brut horaire mission)
@@ -314,10 +330,10 @@ function App() {
   const gA = tot.gain * 12, gX = gA * xf;
 
   const scenData = useMemo(() => [0,10,20,30,50,100].map(p => {
-    const rows = data.map(r => simRow(r, p/100, p/100));
+    const rows = data.map(r => simRow(r, p/100, p/100, useCalibrated));
     const g = rows.reduce((s,r)=>s+r.gain,0);
     return {name:p+'%', gM:g, gA:g*12, gX:g*12*xf};
-  }), [data,xf]);
+  }), [data,xf,useCalibrated]);
 
   // ─── PERCOL (spec v3 : pctEligible, tauxHoraire, plafonds, 2 scénarios FS) ─────
   const percol = useMemo(() => {
@@ -741,6 +757,24 @@ function App() {
         <div style={{padding:14,background:'#1c1107',border:'1px solid #854d0e',borderRadius:12,marginBottom:20,fontSize:12,color:'#fbbf24',lineHeight:1.6}}>
           <strong>Données sur 1 mois</strong> — Pas de plafond à l'entrée CET (IFM + ICCP illimitées — avocat 28/04).<br/>
           <strong>Plafond CET → PERCOL calculé par salarié</strong> : 10j × 7h × <em>son</em> taux horaire (art. 6-3-2). Taux horaire moyen : <strong>{tauxHoraireCalc.toFixed(2)} €/h</strong> → plafond moyen <strong>{fmtE(percol.plafondPERCOL)}/an</strong>. {(percol.pctSalariesAuPlafond*100).toFixed(0)}% des salariés atteignent leur plafond. La fraction excédentaire moyenne ({fmtE(percol.cetAnExcessMoyen)}/an/salarié) subit cotisations SS + IR de droit commun.
+        </div>
+
+        {/* Calibration RGDU sur réduction réelle bulletin */}
+        <div style={{padding:14,background:'#0f172a',border:'1px solid #1e3a8a',borderRadius:12,marginBottom:20,fontSize:13,color:'#bae6fd',lineHeight:1.6}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
+            <strong style={{color:'#fff'}}>Calibration RGDU</strong>
+            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12}}>
+              <input type="checkbox" checked={useCalibrated} onChange={e=>setUseCalibrated(e.target.checked)} style={{cursor:'pointer'}}/>
+              <span>Utiliser la <em>Réduction générale</em> réelle du CSV comme baseline</span>
+            </label>
+          </div>
+          <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+            <strong style={{color:useCalibrated?'#22c55e':'#fbbf24'}}>{useCalibrated ? 'Mode CALIBRÉ' : 'Mode FORMULE PURE'}</strong> —{' '}
+            {useCalibrated
+              ? <>{tot.nCalibrated}/{tot.n} salariés avec réduction réelle. Coefficient moyen <strong style={{color:'#3b82f6'}}>k = {tot.kMoyen.toFixed(3)}</strong> (formule × {(1/Math.max(tot.kMoyen,0.001)).toFixed(2)} → bulletin). Coefficient global <strong style={{color:'#3b82f6'}}>k = {tot.kGlobal.toFixed(3)}</strong>.</>
+              : <>Calcul pur formule. Réduction baseline totale <strong>{fmtE(tot.rB)}/mois</strong>. Réduction réelle CSV totale <strong>{fmtE(tot.redActSum)}/mois</strong> (écart × {(tot.rB/Math.max(tot.redActSum,1)).toFixed(2)}).</>
+            }
+          </div>
         </div>
 
         {/* Slider éligibilité */}
