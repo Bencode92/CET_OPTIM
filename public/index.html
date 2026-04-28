@@ -31,7 +31,7 @@ const RGDU = {smicH:12.02, seuil:3, tMin:0.02, tMax:0.4013, tDelta:0.3813, pow:1
 const COTIS = 0.48;
 const PROXY = 'https://studyforge-proxy.benoit-comas.workers.dev';
 const GH_PATH = 'Bencode92/CET_OPTIM/contents/data/historique/latest_marges.csv';
-const TABS = ['Données','Détail salariés','Graphiques','Vue d\'ensemble','Détail expert'];
+const TABS = ['Données','Détail salariés','Graphiques','Vue d\'ensemble','Détail expert','Méthodologie'];
 
 // ─── Styles ───────────────────────────────────────────────────────────────
 const S = {
@@ -169,7 +169,15 @@ function simRow(row, pi, pc) {
   const ci = row.ifm*pi, cc = row.iccp*pc, ct = ci+cc;
   const bc = row.brut - ci - cc;
   const rb = calcRgdu(row.hrs, row.brut), rc = calcRgdu(row.hrs, bc);
-  return {...row, cetIfm:ci, cetIccp:cc, cetTotal:ct, brutCet:bc, redBase:rb, redCet:rc, gain:rc-rb};
+  // Plafond CET→PERCOL par salarié : 10j × 7h × taux horaire individuel (art. 6-3-2)
+  // Taux horaire = brut hors primes / heures payées
+  const tauxHoraireRow = row.hrs > 0 ? (row.brut - row.ifm - row.iccp) / row.hrs : 0;
+  const plafondAnRow = 10 * 7 * tauxHoraireRow;
+  const cetAnRow = ct * 12;
+  const cetAnPlafonneRow = Math.min(cetAnRow, plafondAnRow);
+  const cetAnExcessRow = Math.max(0, cetAnRow - plafondAnRow);
+  return {...row, cetIfm:ci, cetIccp:cc, cetTotal:ct, brutCet:bc, redBase:rb, redCet:rc, gain:rc-rb,
+    tauxHoraireRow, plafondAnRow, cetAnRow, cetAnPlafonneRow, cetAnExcessRow};
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────
@@ -288,8 +296,15 @@ function App() {
   // ─── Simulation ──────────────────────────────────────────────────
   const sim = useMemo(() => data.map(r => simRow(r, pctIfm/100, pctIccp/100)), [data,pctIfm,pctIccp]);
   const tot = useMemo(() => {
-    const t = {n:sim.length, hrs:0, brut:0, brutBase:0, ifm:0, iccp:0, cet:0, rB:0, rC:0, gain:0};
-    sim.forEach(r => { t.hrs+=r.hrs; t.brut+=r.brut; t.brutBase+=(r.brut-r.ifm-r.iccp); t.ifm+=r.ifm; t.iccp+=r.iccp; t.cet+=r.cetTotal; t.rB+=r.redBase; t.rC+=r.redCet; t.gain+=r.gain; });
+    const t = {n:sim.length, hrs:0, brut:0, brutBase:0, ifm:0, iccp:0, cet:0, rB:0, rC:0, gain:0,
+      cetAnPlafonne:0, cetAnExcess:0, plafondAn:0};
+    sim.forEach(r => {
+      t.hrs+=r.hrs; t.brut+=r.brut; t.brutBase+=(r.brut-r.ifm-r.iccp);
+      t.ifm+=r.ifm; t.iccp+=r.iccp; t.cet+=r.cetTotal;
+      t.rB+=r.redBase; t.rC+=r.redCet; t.gain+=r.gain;
+      t.cetAnPlafonne+=r.cetAnPlafonneRow; t.cetAnExcess+=r.cetAnExcessRow;
+      t.plafondAn+=r.plafondAnRow;
+    });
     return t;
   }, [sim]);
   // Taux horaire base calculé depuis les données (art. 6-3-2 : salaire brut horaire mission)
@@ -316,14 +331,12 @@ function App() {
     const nbPercol = Math.round(nbAdhCET * pChoixP);
     const nbCash = nbAdhCET - nbPercol;
 
-    // Valeur jour et plafond PERCOL sortie (pas de plafond à l'entrée CET — avocat confirmé)
+    // Plafond moyen et taux horaire moyen (pour affichage uniquement — calculs réels par salarié)
     const valeurJour = tauxHoraireCalc * 7;
-    const plafondPERCOL = 10 * valeurJour; // 10 jours × 7h × taux = exonération max sortie PERCOL
+    const plafondPERCOL = tot.n > 0 ? tot.plafondAn / tot.n : 10 * valeurJour; // moyenne des plafonds individuels
 
     // Average CET per worker from file (monthly)
-    // IFM : pctIfm% de l'IFM totale (pas de plafond — avocat confirmé)
     const ifmMoy = tot.n > 0 ? tot.ifm * (pctIfm/100) / tot.n : 0;
-    // ICCP : pctIccp% de l'ICCP totale (pas de plafond entrée — avocat confirmé, 10j inopérant intérimaires)
     const iccpMoy = tot.n > 0 ? tot.iccp * (pctIccp/100) / tot.n : 0;
     const cetMoyMois = ifmMoy + iccpMoy;
 
@@ -331,16 +344,20 @@ function App() {
     const cetMensuelAjuste = cetMoyMois * nbAdhCET;
     const cetAnnuelAjuste = cetMensuelAjuste * 12;
 
-    // Per-worker annual CET
+    // Per-worker annual CET (moyenne)
     const cetMoyAn = cetMoyMois * 12;
 
-    // Pool PERCOL per worker capped at plafondPERCOL
-    const cetAnnuelPerWorkerForPercol = Math.min(cetMoyAn, plafondPERCOL);
-    const excessPerWorker = Math.max(0, cetMoyAn - plafondPERCOL);
+    // PER-WORKER plafond appliqué ligne par ligne (avocat 28/04 : plafond = 10×7×taux horaire individuel)
+    // tot.cetAnPlafonne et tot.cetAnExcess sont déjà calculés avec pctIfm/pctIccp via simRow
+    const cetAnPlafonneMoyen = tot.n > 0 ? tot.cetAnPlafonne / tot.n : 0;
+    const cetAnExcessMoyen = tot.n > 0 ? tot.cetAnExcess / tot.n : 0;
+    const pctSalariesAuPlafond = tot.n > 0
+      ? sim.filter(r => r.cetAnRow >= r.plafondAnRow && r.plafondAnRow > 0).length / tot.n
+      : 0;
 
-    // Pools
-    const poolP = cetAnnuelPerWorkerForPercol * nbPercol;
-    const poolExcess = excessPerWorker * nbPercol; // excess goes to cash (full cotisations)
+    // Pools (utilisent les moyennes par salarié plafonnées individuellement)
+    const poolP = cetAnPlafonneMoyen * nbPercol;
+    const poolExcess = cetAnExcessMoyen * nbPercol; // excess goes to cash (full cotisations)
     const poolC = cetMoyAn * nbCash; // cash workers pay full cotisations
 
     // Étage 1: RGDU — gain potentiel si sortie PERCOL (pas de réintégration)
@@ -390,18 +407,18 @@ function App() {
       econPercol: econPercolUnit, spreadUnit,
     };
 
-    // Sensibilité par levier
+    // Sensibilité par levier — utilise plafond par salarié (somme des min individuels)
     function calcTotal(pa,pp,rr,f,pe) {
       const ne = Math.round(tot.n * pe/100);
       const na = Math.round(ne * pa), np = Math.round(na * pp);
-      const vj = tauxHoraireCalc * 7, plP = 10 * vj;
       const ifmW = tot.n>0 ? tot.ifm*(pctIfm/100)/tot.n : 0;
-      const iccpW = tot.n>0 ? tot.iccp*(pctIccp/100)/tot.n : 0; // pas de plafond entrée
+      const iccpW = tot.n>0 ? tot.iccp*(pctIccp/100)/tot.n : 0;
       const cetW = (ifmW + iccpW) * 12;
       const ca = cetW * na;
       const g1 = tot.gain * pa * 12;
       const spr = ca * (rE - rr);
-      const ppoolW = Math.min(cetW, plP);
+      // Plafond appliqué par salarié individuellement (avocat 28/04)
+      const ppoolW = tot.n > 0 ? tot.cetAnPlafonne / tot.n : 0;
       const e3sans = ppoolW * np * 0.25;
       return g1 + spr + e3sans;
     }
@@ -429,8 +446,9 @@ function App() {
       gainRGDU, spreadTotal, spreadReel, gainTotal, gainTotalPrudent,
       valeurJour, plafondPERCOL, tauxCotisSSEvitees,
       perWorker, leviers, impacts,
+      cetAnPlafonneMoyen, cetAnExcessMoyen, pctSalariesAuPlafond,
     };
-  }, [tot,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp]);
+  }, [tot,sim,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp]);
 
   const has = data.length > 0;
 
@@ -447,7 +465,7 @@ function App() {
 
       {/* Tabs */}
       <div style={S.tabBar}>
-        {TABS.map((n,i) => <div key={n} style={{...S.tab(tab===i, i>0&&!has), ...(i===3&&tab!==3&&has?{background:'#052e16',color:'#22c55e',border:'1px solid #166534',borderBottom:'none'}:{})}} onClick={()=>{if(i===0||has)setTab(i);}}>{n}</div>)}
+        {TABS.map((n,i) => <div key={n} style={{...S.tab(tab===i, i>0&&i!==5&&!has), ...(i===3&&tab!==3&&has?{background:'#052e16',color:'#22c55e',border:'1px solid #166534',borderBottom:'none'}:{})}} onClick={()=>{if(i===0||i===5||has)setTab(i);}}>{n}</div>)}
       </div>
 
       {err && <div style={S.errBox}>{err}</div>}
@@ -675,7 +693,7 @@ function App() {
             <PBar label="Participants au CET" value={txAdhCET} onChange={setTxAdhCET} min={10} max={100} step={5}/>
             <PBar label="Choix plan retraite" value={txChoixPERCOL} onChange={setTxChoixPERCOL} min={10} max={100} step={5}/>
           </div>
-          <div style={{marginTop:12,fontSize:11,color:'#64748b'}}>Entrée CET : IFM + ICCP sans plafond. Sortie PERCOL exonérée : 10j × 7h × {tauxHoraireCalc.toFixed(0)} €/h = <strong style={{color:'#22c55e'}}>{fmtE(percol.plafondPERCOL)}/an/salarié</strong>. Au-delà : cotisations classiques.</div>
+          <div style={{marginTop:12,fontSize:11,color:'#64748b'}}>Entrée CET : IFM + ICCP sans plafond. Sortie PERCOL exonérée : <strong>10j × 7h × taux horaire individuel</strong> par salarié — plafond moyen <strong style={{color:'#22c55e'}}>{fmtE(percol.plafondPERCOL)}/an</strong> ({(percol.pctSalariesAuPlafond*100).toFixed(0)}% des salariés atteignent leur plafond). Au-delà : cotisations classiques.</div>
         </div>
 
         {/* S6: ROI */}
@@ -721,8 +739,8 @@ function App() {
 
         {/* Warning 1 mois + plafonds */}
         <div style={{padding:14,background:'#1c1107',border:'1px solid #854d0e',borderRadius:12,marginBottom:20,fontSize:12,color:'#fbbf24',lineHeight:1.6}}>
-          <strong>Données sur 1 mois</strong> — Pas de plafond à l'entrée CET (IFM + ICCP illimitées — avocat confirmé : plafond 10j inopérant pour intérimaires).<br/>
-          Taux horaire base : <strong>{tauxHoraireCalc.toFixed(2)} €/h</strong> → 1 jour = {(tauxHoraireCalc*7).toFixed(0)} € → <strong>Plafond exonération PERCOL sortie = {fmtE(percol.plafondPERCOL)}/an</strong> par salarié (10j × 7h × taux). Au-delà : cotisations classiques.
+          <strong>Données sur 1 mois</strong> — Pas de plafond à l'entrée CET (IFM + ICCP illimitées — avocat 28/04).<br/>
+          <strong>Plafond CET → PERCOL calculé par salarié</strong> : 10j × 7h × <em>son</em> taux horaire (art. 6-3-2). Taux horaire moyen : <strong>{tauxHoraireCalc.toFixed(2)} €/h</strong> → plafond moyen <strong>{fmtE(percol.plafondPERCOL)}/an</strong>. {(percol.pctSalariesAuPlafond*100).toFixed(0)}% des salariés atteignent leur plafond. La fraction excédentaire moyenne ({fmtE(percol.cetAnExcessMoyen)}/an/salarié) subit cotisations SS + IR de droit commun.
         </div>
 
         {/* Slider éligibilité */}
@@ -923,6 +941,186 @@ function App() {
                 </ResponsiveContainer>
               </div>
             ))}
+          </div>
+        </div>
+      </div>}
+
+      {/* ═══ MÉTHODOLOGIE (tab 5) ═══════════════════════════════════════ */}
+      {tab===5 && <div>
+        <div style={{...S.card,background:'#0f172a',borderLeft:'4px solid #06b6d4'}}>
+          <div style={{fontSize:18,fontWeight:700,color:'#fff'}}>Méthodologie complète</div>
+          <div style={{fontSize:12,color:'#94a3b8',marginTop:4}}>Cadre juridique, formules, hypothèses et limites du modèle. Document interne — référence pour le DAF, l'expert paie et le juridique.</div>
+        </div>
+
+        {/* 1. Cadre juridique */}
+        <div style={S.card}>
+          <div style={{fontSize:15,fontWeight:600,color:'#06b6d4',marginBottom:12}}>1. Cadre juridique</div>
+          <div style={{fontSize:13,color:'#d4d4d8',lineHeight:1.7}}>
+            <p style={{marginTop:0}}><strong>Texte de référence :</strong> Accord de branche du <strong>27 mars 2000</strong> relatif à l'aménagement et à la réduction du temps de travail dans le travail temporaire. Ce texte constitue le cadre juridique applicable au CET pour les intérimaires.</p>
+            <p><strong>Mise en place du CET :</strong> ne peut pas se faire par décision unilatérale de l'employeur (DUE). Doit obligatoirement être institué par :</p>
+            <ul style={{margin:'4px 0 8px 20px',color:'#d4d4d8'}}>
+              <li>un accord d'entreprise, OU</li>
+              <li>application directe de l'accord de branche du 27 mars 2000.</li>
+            </ul>
+            <p><strong>Articles applicables :</strong> art. 6-3-1 (éligibilité 910 h sur 12 mois), art. 6-3-2 (1 jour = 7 heures pour conversion).</p>
+            <p><strong>Dispositif fiscal :</strong> art. 81-18° bis CGI (exonération IR transfert CET → PERCOL).</p>
+            <p style={{marginBottom:0}}><strong>Source juridique projet :</strong> Note de l'avocat du 28 avril 2026 — voir <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/Note_juridique_CET_PERCOL.docx</code> et <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/NOTE_JURIDIQUE_SYNTHESE.md</code>.</p>
+          </div>
+        </div>
+
+        {/* 2. Schéma 3 étages */}
+        <div style={S.card}>
+          <div style={{fontSize:15,fontWeight:600,color:'#06b6d4',marginBottom:12}}>2. Schéma de l'optimisation — 3 étages</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:16}}>
+            <div style={{padding:16,background:'#0c1f3d',borderRadius:8,border:'1px solid #1e3a8a'}}>
+              <div style={{fontSize:11,color:'#3b82f6',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Étage 1 — Entrée CET</div>
+              <div style={{fontSize:13,color:'#fff',fontWeight:600,marginBottom:6}}>Allègement RGDU</div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>L'intérimaire place X% de son IFM/ICCP en CET. La base de cotisations mensuelle baisse → l'allègement RGDU augmente (formule 2026). Effet sur l'employeur uniquement.</div>
+            </div>
+            <div style={{padding:16,background:'#1e1b3d',borderRadius:8,border:'1px solid #6d28d9'}}>
+              <div style={{fontSize:11,color:'#a78bfa',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Étage 2 — Détention</div>
+              <div style={{fontSize:13,color:'#fff',fontWeight:600,marginBottom:6}}>Spread trésorerie</div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>L'ETT détient le cash 12 mois. Elle peut le placer à un taux supérieur à celui qu'elle sert au salarié → spread brut. ⚠ Le rendement servi est un <strong>abondement employeur</strong> soumis aux cotisations patronales.</div>
+            </div>
+            <div style={{padding:16,background:'#0a2716',borderRadius:8,border:'1px solid #166534'}}>
+              <div style={{fontSize:11,color:'#22c55e',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Étage 3 — Sortie</div>
+              <div style={{fontSize:13,color:'#fff',fontWeight:600,marginBottom:6}}>Transfert PERCOL</div>
+              <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>À l'option du salarié, transfert CET → PERCOL. Sur la fraction sous plafond : exo cotisations SS (patronales + salariales) + IR. Forfait social 16-20% en remplacement.</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Formules */}
+        <div style={S.card}>
+          <div style={{fontSize:15,fontWeight:600,color:'#06b6d4',marginBottom:12}}>3. Formules de calcul</div>
+
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:6}}>3.1 — Allègement RGDU 2026 (réduction générale dégressive uniformisée)</div>
+            <div style={{padding:12,background:'#0a0f1c',borderRadius:6,fontFamily:'monospace',fontSize:12,color:'#e2e8f0',marginBottom:8}}>
+              C = 0,02 + 0,3813 × [½ × (3 × SMIC × H / Brut − 1)] ^ 1,75
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+              Avec SMIC = 12,02 €/h, H = heures payées, Brut = salaire brut mensuel.<br/>
+              Coefficient de réduction C appliqué à la base de cotisations. <strong>Seuil d'extinction</strong> : 3 × SMIC. <strong>Tmax</strong> = 0,4013 (FNAL 0,50%), <strong>Tmin</strong> = 0,02. Puissance 1,75.<br/>
+              Gain RGDU = (réduction sur brut hors CET) − (réduction sur brut initial), positif quand le brut baisse.
+            </div>
+          </div>
+
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:6}}>3.2 — Plafond d'exonération CET → PERCOL <span style={{color:'#22c55e',fontSize:11}}>(par salarié — confirmé avocat 28/04)</span></div>
+            <div style={{padding:12,background:'#0a0f1c',borderRadius:6,fontFamily:'monospace',fontSize:12,color:'#e2e8f0',marginBottom:8}}>
+              plafond_i = 10 jours × 7 heures × tauxHoraire_i<br/>
+              tauxHoraire_i = (brut_i − ifm_i − iccp_i) / heures_i
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+              <strong>Calcul individuel</strong> pour chaque salarié de l'échantillon. À 28 €/h ≈ 1 960 €/an. La fraction du CET annuel dépassant <em>plafond_i</em> est soumise au régime social et fiscal de droit commun.
+            </div>
+          </div>
+
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:6}}>3.3 — Pool PERCOL exonéré (agrégation)</div>
+            <div style={{padding:12,background:'#0a0f1c',borderRadius:6,fontFamily:'monospace',fontSize:12,color:'#e2e8f0',marginBottom:8}}>
+              cetAnPlafonné_moyen = (1/N) × Σᵢ min(cetAn_i, plafond_i)<br/>
+              poolPERCOL = cetAnPlafonné_moyen × nbPercol
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+              <strong>Important</strong> : on somme les minima individuels avant de moyenner (et non pas min(moyenne, moyenne_plafond)). Cela reflète l'hétérogénéité réelle des taux horaires et CET de la population.<br/>
+              <em>nbPercol = N × pctEligible × pctAdhCET × pctChoixPERCOL</em>
+            </div>
+          </div>
+
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:6}}>3.4 — Spread trésorerie (étage 2)</div>
+            <div style={{padding:12,background:'#0a0f1c',borderRadius:6,fontFamily:'monospace',fontSize:12,color:'#e2e8f0',marginBottom:8}}>
+              spreadBrut = (rEtt − rSalarié) × cetAnnuelAjusté<br/>
+              <span style={{color:'#fbbf24'}}>⚠ coûtAbondement = rSalarié × cetAnnuelAjusté × 48% (charges patronales)</span><br/>
+              spreadNet = spreadBrut − coûtAbondement
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
+              Le rendement servi (rSalarié) est qualifié d'abondement employeur et subit les cotisations patronales classiques, indépendamment du plafond 10 j (avocat 28/04).
+            </div>
+          </div>
+
+          <div>
+            <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:6}}>3.5 — Économie nette PERCOL (étage 3)</div>
+            <div style={{padding:12,background:'#0a0f1c',borderRadius:6,fontFamily:'monospace',fontSize:12,color:'#e2e8f0',marginBottom:8}}>
+              econE3 = poolPERCOL × (tauxCotisSSEvitées − forfaitSocial)<br/>
+              <span style={{color:'#94a3b8'}}>tauxCotisSSEvitées = 25 % (cotisations patronales SS hors CSG/CRDS)</span><br/>
+              <span style={{color:'#94a3b8'}}>forfaitSocial = 16 % (gestion pilotée + PEA-PME) ou 20 %</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Hypothèses */}
+        <div style={S.card}>
+          <div style={{fontSize:15,fontWeight:600,color:'#06b6d4',marginBottom:12}}>4. Hypothèses chiffrées et justification</div>
+          <table style={{width:'100%',fontSize:12,color:'#d4d4d8',borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{borderBottom:'1px solid #334155',color:'#94a3b8'}}>
+                <th style={{textAlign:'left',padding:'8px 12px'}}>Paramètre</th>
+                <th style={{textAlign:'right',padding:'8px 12px'}}>Valeur</th>
+                <th style={{textAlign:'left',padding:'8px 12px'}}>Source / justification</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>SMIC horaire</td><td style={{textAlign:'right',padding:'8px 12px'}}>12,02 €</td><td style={{padding:'8px 12px'}}>Valeur 2026</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Seuil extinction RGDU</td><td style={{textAlign:'right',padding:'8px 12px'}}>3 × SMIC</td><td style={{padding:'8px 12px'}}>Code SS art. L241-13</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Tmax RGDU (FNAL 0,50%)</td><td style={{textAlign:'right',padding:'8px 12px'}}>0,4013</td><td style={{padding:'8px 12px'}}>Décret 2026 RGDU</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Tmin RGDU</td><td style={{textAlign:'right',padding:'8px 12px'}}>0,02 (2%)</td><td style={{padding:'8px 12px'}}>Décret 2026 RGDU</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Cotisations patronales (full)</td><td style={{textAlign:'right',padding:'8px 12px'}}>~48 %</td><td style={{padding:'8px 12px'}}>Estimation marge intérim</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Cotisations SS évitées (transfert PERCOL)</td><td style={{textAlign:'right',padding:'8px 12px'}}>~25 %</td><td style={{padding:'8px 12px'}}>Patronales SS hors CSG/CRDS</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Forfait social PERCOL</td><td style={{textAlign:'right',padding:'8px 12px'}}>16 % ou 20 %</td><td style={{padding:'8px 12px'}}><span style={{color:'#fbbf24'}}>⚠ à confirmer gestionnaire</span></td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Éligibilité (910 h / 12 mois)</td><td style={{textAlign:'right',padding:'8px 12px'}}>40 %</td><td style={{padding:'8px 12px'}}>Donnée réelle ETT, art. 6-3-1</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Adhésion CET (parmi éligibles)</td><td style={{textAlign:'right',padding:'8px 12px'}}>50 % (par défaut)</td><td style={{padding:'8px 12px'}}>Estimation, ajustable</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Choix PERCOL (parmi adhérents CET)</td><td style={{textAlign:'right',padding:'8px 12px'}}>30 % (par défaut)</td><td style={{padding:'8px 12px'}}>Population âgée → PERCOL attractif</td></tr>
+              <tr style={{borderBottom:'1px solid #1e293b'}}><td style={{padding:'8px 12px'}}>Rendement CET servi par ETT</td><td style={{textAlign:'right',padding:'8px 12px'}}>2,9 % (ajustable)</td><td style={{padding:'8px 12px'}}>Au-dessus du livret A, sous spread tréso</td></tr>
+              <tr><td style={{padding:'8px 12px'}}>Rendement placement ETT</td><td style={{textAlign:'right',padding:'8px 12px'}}>3,2 % (ajustable)</td><td style={{padding:'8px 12px'}}>Hypothèse trésorerie ETT</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 5. Sources */}
+        <div style={S.card}>
+          <div style={{fontSize:15,fontWeight:600,color:'#06b6d4',marginBottom:12}}>5. Sources documentaires</div>
+          <div style={{fontSize:12,color:'#d4d4d8',lineHeight:1.8}}>
+            <div>📄 <strong>Note juridique avocat — 28 avril 2026</strong> : <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/Note_juridique_CET_PERCOL.docx</code></div>
+            <div>📄 <strong>Synthèse markdown</strong> : <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/NOTE_JURIDIQUE_SYNTHESE.md</code></div>
+            <div>📄 <strong>Accord de branche 27 mars 2000</strong> : <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/CET_Accord_27_mars_2000.pdf</code> (à classer)</div>
+            <div>📄 <strong>Dépêche PRISM N°22</strong> : <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/CET_Depeche_N22.pdf</code> (à classer)</div>
+            <div>📄 <strong>Schéma 3 étages</strong> : <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/SCHEMA_3_ETAGES.md</code></div>
+            <div>📄 <strong>Formules RGDU 2026</strong> : <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/FORMULES_RGDU_2026.md</code></div>
+            <div>📄 <strong>État des lieux</strong> : <code style={{background:'#1e293b',padding:'2px 6px',borderRadius:4,color:'#06b6d4'}}>docs/ETAT_DES_LIEUX.md</code></div>
+            <div style={{marginTop:8,fontSize:11,color:'#64748b'}}>Réglementaire : Code de la Sécurité Sociale art. L241-13 (RGDU) ; CGI art. 81-18° bis (exo IR transfert CET → PERCOL) ; Code du Travail art. L3151-1 et s. (CET).</div>
+          </div>
+        </div>
+
+        {/* 6. Limites */}
+        <div style={{...S.card,background:'#1c1107',border:'1px solid #854d0e'}}>
+          <div style={{fontSize:15,fontWeight:600,color:'#fbbf24',marginBottom:12}}>6. Limites du modèle</div>
+          <div style={{fontSize:12,color:'#d4d4d8',lineHeight:1.8}}>
+            <div><strong style={{color:'#fbbf24'}}>⚠ Recalage RGDU</strong> — La formule appliquée donne un écart × 4,4 vs bulletin réel. Les <strong>deltas entre scénarios</strong> sont fiables, les montants absolus sont à recaler.</div>
+            <div><strong style={{color:'#fbbf24'}}>⚠ Forfait social</strong> — 16 % vs 20 % non tranché. Le simulateur affiche les deux scénarios. À confirmer auprès du gestionnaire PERCOL choisi.</div>
+            <div><strong style={{color:'#fbbf24'}}>⚠ Population homogène extrapolée</strong> — On suppose que l'effectif total (660) a le même profil moyen que l'échantillon. Si les profils diffèrent, l'extrapolation introduit un biais.</div>
+            <div><strong style={{color:'#fbbf24'}}>⚠ Adhésion réelle inconnue</strong> — Les taux d'adhésion CET et de choix PERCOL sont des hypothèses. La sensibilité par levier (onglet Détail expert) permet de mesurer l'impact.</div>
+            <div><strong style={{color:'#fbbf24'}}>⚠ Effet pluri-annuel</strong> — Le modèle est annualisé. Il ne capture pas les effets de rampe (montée en charge des adhésions, effet retraite étalé).</div>
+            <div><strong style={{color:'#fbbf24'}}>⚠ Charges patronales sur abondement (rendement CET)</strong> — Maintenant intégrées dans l'étage 2, mais à valider avec l'expert paie sur la qualification exacte des cotisations applicables.</div>
+          </div>
+        </div>
+
+        {/* 7. Logique métier per-row */}
+        <div style={S.card}>
+          <div style={{fontSize:15,fontWeight:600,color:'#06b6d4',marginBottom:12}}>7. Logique métier — par salarié</div>
+          <div style={{fontSize:12,color:'#d4d4d8',lineHeight:1.7}}>
+            Pour chaque ligne de l'échantillon, le simulateur calcule individuellement :
+            <ol style={{margin:'8px 0 8px 20px',paddingLeft:0}}>
+              <li><strong>Taux horaire</strong> = (brut − IFM − ICCP) / heures payées</li>
+              <li><strong>Plafond annuel CET → PERCOL exonéré</strong> = 10 × 7 × taux horaire</li>
+              <li><strong>CET annuel</strong> = (IFM × pctIfm + ICCP × pctIccp) × 12</li>
+              <li><strong>CET annuel sous plafond</strong> = min(CET annuel, plafond)</li>
+              <li><strong>CET annuel excédentaire</strong> = max(0, CET annuel − plafond) → soumis au régime de droit commun</li>
+              <li><strong>Allègement RGDU</strong> avant et après mise en CET → calcul du gain mensuel</li>
+            </ol>
+            Ces valeurs individuelles sont ensuite agrégées pour calculer les pools PERCOL/cash et les économies nettes par étage.
           </div>
         </div>
       </div>}

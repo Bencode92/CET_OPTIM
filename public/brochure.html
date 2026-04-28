@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Brochure CET — Compte Épargne Temps pour les intérimaires</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<style>
+:root{
+  --bg:#fafaf9;--ink:#1c1917;--muted:#57534e;--card:#ffffff;
+  --green:#16a34a;--blue:#2563eb;--violet:#7c3aed;--amber:#d97706;
+  --line:#e7e5e4;--soft:#f5f5f4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:880px;margin:0 auto;padding:48px 24px 80px}
+header.hero{padding:48px 0 32px;border-bottom:2px solid var(--ink);margin-bottom:48px}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:var(--green);font-weight:600;margin-bottom:12px}
+h1{font-size:48px;line-height:1.1;font-weight:800;letter-spacing:-1px;margin-bottom:16px}
+.lede{font-size:20px;color:var(--muted);max-width:680px;line-height:1.5}
+section{margin-bottom:56px;scroll-margin-top:24px}
+h2{font-size:28px;font-weight:700;margin-bottom:20px;letter-spacing:-0.5px;display:flex;align-items:center;gap:12px}
+h2 .num{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;background:var(--ink);color:#fff;border-radius:50%;font-size:16px;font-weight:700}
+h3{font-size:18px;font-weight:600;margin:24px 0 8px}
+p{margin-bottom:14px}
+p.intro{font-size:18px;color:var(--muted);margin-bottom:24px}
+ul,ol{margin:12px 0 18px 24px}
+li{margin-bottom:8px}
+strong{color:var(--ink);font-weight:600}
+.steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:24px 0}
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;position:relative}
+.step .step-n{position:absolute;top:-14px;left:24px;background:var(--ink);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.step h3{margin-top:8px;font-size:16px}
+.step p{font-size:14px;color:var(--muted);margin:0}
+.callout{background:var(--card);border-left:4px solid var(--green);border-radius:8px;padding:20px 24px;margin:20px 0}
+.callout.blue{border-left-color:var(--blue)}
+.callout.violet{border-left-color:var(--violet)}
+.callout.amber{border-left-color:var(--amber)}
+.callout h4{font-size:15px;font-weight:600;margin-bottom:8px}
+.callout p{font-size:14px;color:var(--muted);margin:0}
+.example{background:var(--soft);border-radius:12px;padding:24px;margin:20px 0}
+.example h4{font-size:16px;font-weight:600;margin-bottom:12px;color:var(--ink)}
+.example .calc{display:grid;grid-template-columns:1fr auto;gap:8px 24px;font-family:'SF Mono',Monaco,monospace;font-size:13px;background:#fff;padding:16px;border-radius:8px;border:1px solid var(--line)}
+.example .calc .label{color:var(--muted)}
+.example .calc .val{font-weight:600;color:var(--ink);text-align:right}
+.example .calc .sep{grid-column:1/-1;border-top:1px dashed var(--line);margin:4px 0}
+.example .calc .total{grid-column:1/-1;display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid var(--ink);font-weight:700;color:var(--green);font-size:16px}
+.faq dt{font-weight:600;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);font-size:16px}
+.faq dt:first-child{border-top:none;padding-top:0;margin-top:0}
+.faq dd{margin:8px 0 0;color:var(--muted);font-size:15px;line-height:1.6}
+.cases{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:24px 0}
+.case{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+.case .age{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:600;margin-bottom:8px}
+.case h3{margin-top:0;font-size:18px}
+.case p{font-size:14px;color:var(--muted);margin-bottom:8px}
+.case .verdict{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:14px;font-weight:600;color:var(--green)}
+.toc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:48px}
+.toc-title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:600;margin-bottom:12px}
+.toc ol{margin:0;padding-left:20px;font-size:15px}
+.toc li{margin-bottom:6px}
+.toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid transparent}
+.toc a:hover{border-bottom-color:var(--ink)}
+footer{margin-top:64px;padding-top:32px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);line-height:1.6}
+footer p{margin-bottom:8px}
+.tag{display:inline-block;background:#dcfce7;color:#15803d;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-right:6px}
+.tag.blue{background:#dbeafe;color:#1d4ed8}
+.tag.violet{background:#ede9fe;color:#6d28d9}
+@media print{
+  .wrap{max-width:none;padding:24px}
+  .toc{display:none}
+  section{page-break-inside:avoid}
+  h1{font-size:32px}
+  .steps,.cases{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  h1{font-size:32px}
+  .steps,.cases{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Document d'information — Salariés intérimaires</div>
+  <h1>Le Compte Épargne Temps (CET), votre épargne en plus</h1>
+  <p class="lede">Mettre une partie de vos primes de côté, percevoir un rendement, et préparer votre retraite — sans payer l'impôt dessus. Voici comment ça marche.</p>
+</header>
+
+<nav class="toc">
+  <div class="toc-title">Sommaire</div>
+  <ol>
+    <li><a href="#cest-quoi">Le CET, c'est quoi ?</a></li>
+    <li><a href="#comment-ca-marche">Comment ça marche en 3 étapes</a></li>
+    <li><a href="#interet">Quel est votre intérêt ?</a></li>
+    <li><a href="#percol">Le PERCOL : préparer votre retraite</a></li>
+    <li><a href="#options">Vos options et vos droits</a></li>
+    <li><a href="#cas">Cas concrets</a></li>
+    <li><a href="#faq">Questions fréquentes</a></li>
+  </ol>
+</nav>
+
+<section id="cest-quoi">
+  <h2><span class="num">1</span>Le CET, c'est quoi ?</h2>
+  <p class="intro">Un compte personnel sur lequel vous mettez une partie de vos primes de fin de mission. L'agence garde l'argent pour vous pendant 12 mois, vous verse un intérêt, et vous décidez ensuite quoi en faire.</p>
+
+  <p>Quand vous travaillez en intérim, à la fin de chaque mission vous touchez deux primes :</p>
+  <ul>
+    <li><strong>L'IFM</strong> (Indemnité de Fin de Mission) — environ 10 % de votre salaire brut</li>
+    <li><strong>L'ICCP</strong> (Indemnité Compensatrice de Congés Payés) — environ 10 % aussi</li>
+  </ul>
+  <p>Aujourd'hui, ces primes vous sont versées avec votre paye. Avec le CET, vous avez le choix : <strong>en garder une partie sur un compte chez nous</strong>, qui rapporte un intérêt, et que vous pouvez transformer en épargne retraite plus tard.</p>
+
+  <div class="callout">
+    <h4>Vous restez maître de votre argent</h4>
+    <p>Le CET est un dispositif <strong>volontaire</strong>. Vous décidez du pourcentage de l'IFM et de l'ICCP que vous souhaitez y placer (par exemple 50 % ou 100 %). Vous pouvez changer d'avis à chaque mission.</p>
+  </div>
+</section>
+
+<section id="comment-ca-marche">
+  <h2><span class="num">2</span>Comment ça marche en 3 étapes</h2>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n">1</div>
+      <h3>Vous épargnez</h3>
+      <p>À chaque fin de mission, le pourcentage que vous avez choisi de votre IFM et ICCP est placé sur votre CET au lieu d'être versé sur votre compte.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">2</div>
+      <h3>Votre épargne fructifie</h3>
+      <p>Pendant 12 mois, l'agence garde votre argent et vous verse un intérêt (taux annoncé chaque année, par exemple <strong>2,9 %</strong>).</p>
+    </div>
+    <div class="step">
+      <div class="step-n">3</div>
+      <h3>Vous choisissez la suite</h3>
+      <p>Au bout d'un an, deux options : récupérer l'argent en cash, ou le transférer dans un plan d'épargne retraite (PERCOL) pour aller plus loin.</p>
+    </div>
+  </div>
+</section>
+
+<section id="interet">
+  <h2><span class="num">3</span>Quel est votre intérêt ?</h2>
+  <p class="intro">Trois bénéfices qui se cumulent : un rendement, une fiscalité allégée, et une vraie épargne disponible.</p>
+
+  <h3>1. Un rendement supérieur au livret A</h3>
+  <p>Le taux servi sur votre CET est annoncé chaque année. À titre d'exemple, à <strong>2,9 % brut</strong>, c'est plus élevé que la plupart des livrets bancaires courants. Sur 1 000 € épargnés pendant 12 mois, vous gagnez 29 € d'intérêt.</p>
+
+  <h3>2. Une fiscalité avantageuse si vous transférez vers le PERCOL</h3>
+  <p>Si vous décidez de basculer votre CET en PERCOL (épargne retraite, voir section 4), une partie de l'argent est <strong>exonérée d'impôt sur le revenu et de cotisations sociales</strong>. Cette part exonérée est plafonnée chaque année à :</p>
+  <div class="callout blue">
+    <h4>Plafond d'exonération annuel</h4>
+    <p><strong>10 jours × 7 heures × votre taux horaire</strong>. À 28 €/h, cela fait environ <strong>1 960 € par an exonérés</strong>. Au-delà, vous pouvez aussi transférer mais sans cet avantage social.</p>
+  </div>
+
+  <h3>3. Une épargne disponible (avec quelques règles)</h3>
+  <p>L'argent que vous avez sur le CET, vous pouvez le récupérer au bout de 12 mois en cash, ou le faire fructifier davantage en PERCOL. Vous gardez la main.</p>
+
+  <div class="example">
+    <h4>Exemple chiffré : Marie, 200 € d'IFM par mois</h4>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:12px">Marie travaille en mission régulière, son taux horaire est 28 €/h. Elle décide de placer 100 % de son IFM en CET pendant un an.</p>
+    <div class="calc">
+      <span class="label">IFM mensuelle placée</span><span class="val">200 €</span>
+      <span class="label">× 12 mois</span><span class="val">2 400 €</span>
+      <span class="sep"></span>
+      <span class="label">Intérêt annuel à 2,9 %</span><span class="val">+ 35 €</span>
+      <span class="sep"></span>
+      <span class="label">Si transfert en PERCOL : exonéré jusqu'à</span><span class="val">1 960 €</span>
+      <span class="label">Au-delà, soumis à cotisations + IR comme un salaire</span><span class="val">440 €</span>
+      <div class="total"><span>Total CET fin d'année</span><span>2 435 €</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="percol">
+  <h2><span class="num">4</span>Le PERCOL : préparer votre retraite</h2>
+  <p class="intro">Le PERCOL (Plan d'Épargne Retraite Collectif) est une épargne bloquée jusqu'à votre retraite, avec un avantage fiscal important — particulièrement intéressant si vous êtes proche de la retraite.</p>
+
+  <p>Au bout de 12 mois sur le CET, vous pouvez <strong>transférer tout ou partie</strong> de votre épargne vers un PERCOL. L'argent sort des comptes de l'agence et est géré par un gestionnaire d'épargne (Amundi, Natixis, etc.) qui le place sur des fonds que vous choisissez.</p>
+
+  <h3>Les avantages du transfert CET → PERCOL</h3>
+  <ul>
+    <li><strong>Exonération d'impôt sur le revenu</strong> sur la totalité du montant transféré (sous le plafond)</li>
+    <li><strong>Exonération de cotisations sociales</strong> sur la fraction sous plafond annuel</li>
+    <li><strong>Rendement du marché</strong> selon la gestion choisie (sécurisée, équilibrée, dynamique)</li>
+    <li><strong>À la retraite</strong> : sortie en capital, en rente, ou les deux. <strong>Aucune cotisation sociale n'est prélevée sur le capital issu du CET</strong> (uniquement sur les plus-values)</li>
+  </ul>
+
+  <div class="callout violet">
+    <h4>Le choix du rendement à la fin de l'année</h4>
+    <p>L'intérêt accumulé pendant les 12 mois sur votre CET (les 35 € de l'exemple plus haut) peut, <strong>au choix</strong> : (a) être transféré avec le principal vers le PERCOL, ou (b) vous être versé en cash directement. Vous décidez au moment du transfert.</p>
+  </div>
+
+  <h3>Les conditions de retrait anticipé</h3>
+  <p>L'argent dans le PERCOL est <strong>en principe bloqué jusqu'à votre retraite</strong>. Vous pouvez toutefois le débloquer en avance dans 6 cas précis :</p>
+  <ul>
+    <li>Invalidité (la vôtre, votre conjoint, vos enfants)</li>
+    <li>Décès de votre conjoint ou partenaire de PACS</li>
+    <li>Fin de vos droits au chômage</li>
+    <li>Surendettement (sur décision de la commission)</li>
+    <li>Liquidation judiciaire d'une activité non salariée</li>
+    <li>Acquisition de votre résidence principale</li>
+  </ul>
+</section>
+
+<section id="options">
+  <h2><span class="num">5</span>Vos options et vos droits</h2>
+
+  <h3>Vous êtes libre de choisir</h3>
+  <ul>
+    <li><strong>Le pourcentage</strong> d'IFM et d'ICCP que vous placez (50 %, 100 %, ou un autre choix selon les options offertes)</li>
+    <li><strong>La destination</strong> au bout de 12 mois : récupérer en cash ou transférer en PERCOL</li>
+    <li><strong>Le sort du rendement capitalisé</strong> : transféré avec le principal vers PERCOL, ou perçu directement</li>
+    <li><strong>La gestion PERCOL</strong> : sécurisée, équilibrée ou dynamique, avec arbitrage possible</li>
+  </ul>
+
+  <h3>L'agence peut faire évoluer le taux</h3>
+  <p>Le taux de rendement servi sur votre CET (2,9 % à titre indicatif) <strong>peut être révisé</strong> chaque année selon les conditions du marché, à la hausse comme à la baisse. Vous serez prévenu par une note de service.</p>
+
+  <h3>Conditions d'accès</h3>
+  <p>Pour pouvoir alimenter un CET, vous devez avoir effectué au moins <strong>910 heures de travail au cours des 12 derniers mois</strong> dans notre agence (article 6-3-1 de l'accord de branche du 27 mars 2000).</p>
+</section>
+
+<section id="cas">
+  <h2><span class="num">6</span>Cas concrets</h2>
+  <p class="intro">Trois profils-types pour vous aider à vous projeter.</p>
+
+  <div class="cases">
+    <div class="case">
+      <div class="age">Profil — 28 ans</div>
+      <h3>Lucas, intérimaire en BTP</h3>
+      <p>Taux horaire 22 €/h. Il met 50 % de son IFM en CET, soit 100 €/mois. Pas pressé pour la retraite, il préfère la flexibilité.</p>
+      <p><strong>Stratégie</strong> : récupérer le CET en cash chaque année pour financer un projet (permis, déménagement, formation). Les intérêts CET viennent en bonus.</p>
+      <div class="verdict">→ Le CET sert d'épargne court terme avec rendement 2,9 %.</div>
+    </div>
+    <div class="case">
+      <div class="age">Profil — 58 ans</div>
+      <h3>Patricia, intérimaire qualifiée</h3>
+      <p>Taux horaire 28 €/h. À 4 ans de la retraite. Elle place 100 % IFM + ICCP en CET, soit 400 €/mois.</p>
+      <p><strong>Stratégie</strong> : transfert intégral CET → PERCOL chaque année. Sur 4 ans, elle accumulera <strong>~19 200 €</strong> totalement exonérés d'impôt sur le revenu, plus les rendements.</p>
+      <div class="verdict">→ Capital retraite défiscalisé, sortie en capital à la liquidation.</div>
+    </div>
+  </div>
+
+  <div class="example">
+    <h4>Cas chiffré senior : Patricia, 4 ans avant la retraite</h4>
+    <div class="calc">
+      <span class="label">IFM + ICCP placés mensuellement</span><span class="val">400 €</span>
+      <span class="label">× 12 mois</span><span class="val">4 800 €/an</span>
+      <span class="label">Plafond exonération PERCOL (10×7×28)</span><span class="val">1 960 €/an</span>
+      <span class="sep"></span>
+      <span class="label">Part exonérée IR + SS</span><span class="val">1 960 €</span>
+      <span class="label">Part au-delà : exonérée IR uniquement, soumise SS</span><span class="val">2 840 €</span>
+      <span class="sep"></span>
+      <span class="label">Économie IR sur la totalité (TMI 30 %)</span><span class="val">+ 1 440 €/an</span>
+      <span class="label">Capital PERCOL à 4 ans (hors plus-values)</span><span class="val">19 200 €</span>
+      <div class="total"><span>Économie IR cumulée 4 ans</span><span>+ 5 760 €</span></div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-top:12px;margin-bottom:0">À la retraite, Patricia récupère ses 19 200 € en capital sans nouvelle imposition (les plus-values seules sont taxées à 30 %).</p>
+  </div>
+</section>
+
+<section id="faq">
+  <h2><span class="num">7</span>Questions fréquentes</h2>
+  <dl class="faq">
+    <dt>Si je quitte l'agence avant 12 mois, je perds mon CET ?</dt>
+    <dd>Non. Vos droits sont acquis dès le premier jour. À votre départ, vous récupérez le solde de votre CET, soit en cash, soit en transfert vers un autre dispositif d'épargne (selon votre situation).</dd>
+
+    <dt>Le taux 2,9 % est-il garanti ?</dt>
+    <dd>Le taux est annoncé pour l'année et appliqué pour la durée de détention. Il peut évoluer pour les nouvelles périodes selon les conditions de marché — vous serez prévenu par note de service.</dd>
+
+    <dt>Combien puis-je placer au maximum ?</dt>
+    <dd>Aucun plafond légal sur ce que vous placez en CET (IFM et ICCP). Le plafond de 1 960 €/an s'applique <strong>uniquement</strong> à la fraction exonérée lors d'un transfert vers le PERCOL — vous pouvez transférer plus, mais sans avantage social au-delà.</dd>
+
+    <dt>Et si j'ai un imprévu, je peux récupérer mon CET avant 12 mois ?</dt>
+    <dd>Le CET est mobilisable en cash après la période de détention de 12 mois. Pour le PERCOL, des cas de déblocage anticipé existent (invalidité, surendettement, achat résidence principale, etc. — voir section 4).</dd>
+
+    <dt>Puis-je arrêter le CET en cours d'année ?</dt>
+    <dd>Oui. Vous pouvez ajuster ou arrêter vos versements à tout moment. Les sommes déjà placées restent sur votre CET et continuent à produire des intérêts.</dd>
+
+    <dt>L'agence fait quoi avec mon argent ?</dt>
+    <dd>Elle conserve votre épargne sur ses comptes pendant les 12 mois et vous verse l'intérêt convenu. Vos droits sont juridiquement acquis et garantis indépendamment de la santé financière de l'agence (cf. accord de branche du 27 mars 2000).</dd>
+
+    <dt>Et l'impôt sur les intérêts CET ?</dt>
+    <dd>Si vous récupérez votre CET en cash, les intérêts sont imposés comme un salaire. Si vous transférez vers le PERCOL, les intérêts peuvent suivre le même régime que le principal (à votre choix).</dd>
+
+    <dt>Comment je signe ? Quelles démarches ?</dt>
+    <dd>Un bulletin d'adhésion vous sera remis. Vous indiquez les pourcentages d'IFM et d'ICCP que vous souhaitez placer. Vous pouvez modifier ce choix à chaque renouvellement de mission.</dd>
+  </dl>
+</section>
+
+<footer>
+  <p><strong>Document d'information non contractuel.</strong> Pour toute question personnelle, contactez votre agence ou le service paie.</p>
+  <p>Cadre juridique : Accord de branche du 27 mars 2000 relatif au travail temporaire. Article 6-3-1 (éligibilité), article 6-3-2 (1 jour = 7 heures). Article 81-18° bis du Code Général des Impôts (exonération d'impôt sur le revenu au transfert CET → PERCOL).</p>
+  <p>Les chiffres présentés sont indicatifs et basés sur la situation au 28 avril 2026. Le régime fiscal et social du PERCOL peut évoluer.</p>
+</footer>
+
+</div>
+</body>
+</html>
