@@ -10,7 +10,7 @@
 | **Dispositif** | Compte Épargne Temps (CET) |
 | **Cadre juridique** | Accord de branche du 27 mars 2000 (étendu 27/07/2000) — Articles L.3151-1 à L.3153-2 du Code du travail |
 | **Éligibilité** | 910 heures travaillées sur les 12 derniers mois chez CAMÉLÉONS RH |
-| **Rémunération du CET** | **3 % par an**, créditée au 31 décembre |
+| **Rémunération du CET** | **3 % par an au prorata journalier**, capitalisée et créditée au 31 décembre |
 | **Durée maximale** | 5 ans après accumulation de 22 jours équivalents |
 | **Adhésion** | Strictement facultative, à votre seule initiative |
 
@@ -76,7 +76,7 @@ Le CET est mobilisable :
 
 - **Sommes débloquées en cash** : soumises aux cotisations de sécurité sociale et à l'impôt sur le revenu au moment du versement (article L.3152-3 du Code du travail).
 - **Transfert vers un PERCOL** : exonération d'IR et de cotisations sociales sur la fraction sous plafond (10 jours × 7 heures × votre taux horaire).
-- **Rémunération 3 %** : constitue un complément de rémunération soumis aux cotisations.
+- **Rémunération 3 %** : calculée au prorata journalier sur chaque versement (3 % × jours de détention / 365), capitalisée et créditée au 31 décembre. Constitue un complément de rémunération soumis aux cotisations sociales au moment du versement (article L.3152-3 du Code du travail).
 
 ---
 

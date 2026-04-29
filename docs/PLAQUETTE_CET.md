@@ -5,7 +5,7 @@
 
 ## Ce que CAMÉLÉONS RH met en place pour vous
 
-Un **Compte Épargne Temps (CET)** : vous mettez de côté une partie de vos primes IFM et ICCP au lieu de les recevoir en cash. Cette épargne **rapporte 3 % par an** et peut être transférée vers un **plan d'épargne retraite** avec une fiscalité très avantageuse.
+Un **Compte Épargne Temps (CET)** : vous mettez de côté une partie de vos primes IFM et ICCP au lieu de les recevoir en cash. Cette épargne **rapporte 3 % par an au prorata journalier** et peut être transférée vers un **plan d'épargne retraite** avec une fiscalité très avantageuse.
 
 **C'est facultatif. C'est gratuit. C'est votre argent.**
 
@@ -16,7 +16,7 @@ Un **Compte Épargne Temps (CET)** : vous mettez de côté une partie de vos pri
 | **3 %** | **1 960 €** | **910 h** |
 |:---:|:---:|:---:|
 | Taux annuel servi | Plafond exonéré (à 28 €/h) | Heures requises pour adhérer |
-| sur votre solde au 31/12 | au transfert PERCOL | sur les 12 derniers mois |
+| au prorata journalier | au transfert PERCOL | sur les 12 derniers mois |
 
 ---
 

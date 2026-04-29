@@ -60,9 +60,9 @@ Avec le CET, vous choisissez d'en mettre **une partie en épargne** : 50 %, 100 
 
 Pendant 12 mois, CAMÉLÉONS RH garde votre argent et vous **verse un intérêt**.
 
-Le taux de référence proposé est par exemple **3 % brut annuel** — bien au-dessus du Livret A.
+Le taux de référence proposé est par exemple **3 % brut annuel**, calculé **au prorata journalier** : chaque euro placé rapporte 3 % du nombre de jours pendant lesquels il est resté sur votre CET.
 
-Sur 1 000 € épargnés, c'est **+ 30 € d'intérêt** au bout d'un an.
+Sur 1 000 € placés en début d'année, c'est **+ 30 €** au 31 décembre. Sur 1 000 € placés au 1er juillet, c'est **+ 15 €** (6 mois de placement).
 
 ### Étape 3 — Vous choisissez la suite
 
@@ -88,11 +88,13 @@ Si elle place **100 % de son IFM et de son ICCP en CET** sur l'année :
 
 | Élément | Montant |
 |---|---:|
-| Total placé sur 12 mois | 4 800 € |
-| Intérêts à 3 % | + 144 € |
-| **Solde CET fin d'année** | **4 939 €** |
+| Total placé sur 12 mois (400 € × 12) | 4 800 € |
+| Intérêts à 3 % au prorata journalier | + 78 € |
+| **Solde CET fin d'année** | **4 878 €** |
 
-→ Marie a **4 944 €** disponibles pour la suite, à choisir entre cash et PERCOL.
+> Pourquoi ~78 € et pas 144 € ? Parce que les 400 € versés en janvier rapportent 12 mois d'intérêts, ceux de décembre seulement 1 mois. En moyenne ≈ 6 mois.
+
+→ Marie a **4 878 €** disponibles pour la suite, à choisir entre cash et PERCOL.
 
 ---
 
@@ -171,7 +173,9 @@ C'est l'**article 6-3-2** de l'accord de branche : 1 jour = 7 heures, valorisé 
 
 ## Et le rendement servi pendant les 12 mois ?
 
-Pendant que votre argent est sur le CET, CAMÉLÉONS RH vous verse un intérêt (par exemple 3 %).
+Pendant que votre argent est sur le CET, CAMÉLÉONS RH vous verse un intérêt (par exemple 3 % brut annuel, **calculé au prorata journalier**).
+
+> **Comment c'est calculé** : chaque euro placé rapporte 3 % × (nombre de jours sur le CET / 365). Les intérêts sont **capitalisés et crédités au 31 décembre** de chaque année. Si vous clôturez votre CET en cours d'année, le calcul est fait au prorata jusqu'à la date de clôture.
 
 À la fin de l'année, **vous décidez** ce qu'il devient :
 
@@ -192,11 +196,11 @@ Pendant que votre argent est sur le CET, CAMÉLÉONS RH vous verse un intérêt 
 
 | Année | Solde CET fin d'année | Choix |
 |---|---:|---|
-| Année 1 | 1 236 € (1 200 € + 36 € d'intérêt) | Récupère en cash |
-| Année 2 | 1 236 € | Récupère en cash |
-| Année 3 | 1 236 € | … |
+| Année 1 | 1 220 € (1 200 € + 20 € d'intérêts au prorata) | Récupère en cash |
+| Année 2 | 1 220 € | Récupère en cash |
+| Année 3 | 1 220 € | … |
 
-**Bilan** : Lucas utilise le CET comme un **livret rémunéré** à 3 %. Il finance ses projets avec son épargne plus les intérêts.
+**Bilan** : Lucas utilise le CET comme un **livret rémunéré** à 3 % (prorata journalier). Il finance ses projets avec son épargne plus les intérêts.
 
 → Pas de PERCOL pour Lucas. Mais le CET reste très utile.
 
@@ -210,9 +214,9 @@ Pendant que votre argent est sur le CET, CAMÉLÉONS RH vous verse un intérêt 
 
 | Année 1 | Détail |
 |---|---:|
-| Total placé | 4 320 € |
-| Intérêts CET 3 % | + 130 € |
-| Solde fin d'année | 4 450 € |
+| Total placé (360 € × 12) | 4 320 € |
+| Intérêts CET 3 % au prorata journalier | + 70 € |
+| Solde fin d'année | 4 390 € |
 
 À la fin de l'année, Sandrine **transfère en PERCOL** :
 - **Plafond exonéré** : 18 × 7 × 10 = **1 260 €/an**
@@ -234,9 +238,9 @@ Pendant que votre argent est sur le CET, CAMÉLÉONS RH vous verse un intérêt 
 ### Année 1
 | Élément | Montant |
 |---|---:|
-| Total placé | 4 800 € |
-| Intérêts | + 144 € |
-| **Solde CET** | **4 944 €** |
+| Total placé (400 € × 12) | 4 800 € |
+| Intérêts à 3 % au prorata journalier | + 78 € |
+| **Solde CET an 1** | **4 878 €** |
 | Plafond exonéré (10 × 7 × 28) | 1 960 € |
 | Part exonérée IR + cotisations | 1 960 € |
 | Part imposable | 2 979 € |

@@ -80,9 +80,18 @@ Les sommes que vous placez sur votre CET sont **rémunérées au taux de 3 % par
 
 ### 5.1 — Modalités de calcul
 
-- La rémunération de **3 %** s'applique sur le montant total des sommes inscrites à votre CET (indemnités, primes, jours convertis en argent)
-- Elle est **calculée et créditée annuellement** sur votre CET, à la date du **31 décembre**
-- En cas de **clôture du CET en cours d'année**, la rémunération est calculée **prorata temporis** à la date de clôture
+- La rémunération de **3 %** s'applique **au prorata journalier** sur chaque versement effectué au CET
+- **Formule** : pour chaque somme placée, intérêt = montant × 3 % × (nombre de jours de détention / 365)
+- Les intérêts sont **capitalisés et crédités au 31 décembre** de chaque année
+- En cas de **clôture du CET en cours d'année**, la rémunération est calculée **au prorata journalier jusqu'à la date de clôture**
+
+### Exemple de calcul
+
+| Versement | Date | Jours de détention | Intérêts |
+|---:|:---:|:---:|---:|
+| 1 000 € | 1er janvier | 365 | 30,00 € |
+| 1 000 € | 1er juillet | 184 | 15,12 € |
+| 1 000 € | 1er décembre | 31 | 2,55 € |
 
 ### 5.2 — Régime social et fiscal
 
