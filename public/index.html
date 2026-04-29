@@ -296,6 +296,7 @@ function App() {
   const [pctEligible, setPctEligible] = useState(40); // donnée réelle : 40% ont 910h d'ancienneté
   const [useCalibrated, setUseCalibrated] = useState(true); // calibration RGDU sur Réduction générale réelle (CSV)
   const [txSSEvitees, setTxSSEvitees] = useState(28.91); // % cotisations SS évitées au transfert PERCOL — 28,91 = défaut, 25 = mode prudent
+  const [txAbondementPercol, setTxAbondementPercol] = useState(1.5); // % abondement employeur sur montant transféré au PERCOL (0 = pas d'abondement, 1.5 = scénario B retenu, 3 = scénario A)
 
   // Auto-load from GitHub
   useEffect(() => {
@@ -405,15 +406,25 @@ function App() {
     // Étage 2: Spread trésorerie (rendement simple, pas d'abondement)
     const spreadReel = cetAnnuelAjuste * (rE - rS);
 
-    // Étage 3: SS cotisations evitees only (25%)
+    // Étage 3: SS cotisations evitees only
     // Périmètre légal : « assurances sociales + allocations familiales » (transfert CET → PERCOL)
     // Défaut 0,2891 = maladie 13% + AF 5,25% + vieillesse plafonnée 8,55% + déplafonnée 2,11%
     const tauxCotisSSEvitees = txSSEvitees / 100;
+    const txAbond = txAbondementPercol / 100;
     const poolPercolTotal = poolP; // only PERCOL workers, capped
-    // Sans forfait social
+    // Économie SS évitée brute (sans forfait social ni abondement)
     const econE3SansFS = poolPercolTotal * tauxCotisSSEvitees;
-    // Avec forfait social
+    // Économie SS évitée nette du forfait social
     const econE3AvecFS = poolPercolTotal * (tauxCotisSSEvitees - fs);
+    // Coût de l'abondement employeur PERCOL :
+    //   - Coût brut = abondement = pool × txAbond
+    //   - Coût forfait social sur l'abondement = abondement × fs
+    //   - L'abondement est exonéré de cotisations sociales mais subit le forfait social
+    const abondementBrut = poolPercolTotal * txAbond;
+    const coutAbondementFS = abondementBrut * fs;
+    const coutAbondementTotal = abondementBrut + coutAbondementFS;
+    // Économie nette finale (étage 3 avec abondement employeur)
+    const econE3AvecAbondement = econE3AvecFS - coutAbondementTotal;
 
     // Legacy fields for backward compat
     const spreadTotal = spreadReel;
@@ -421,6 +432,23 @@ function App() {
     const gainNetEtage3AvecFS = econE3AvecFS;
     const gainTotal = gainRGDU + spreadReel + econE3SansFS;
     const gainTotalPrudent = gainRGDU + spreadReel + econE3AvecFS;
+    const gainTotalAvecAbondement = gainRGDU + spreadReel + econE3AvecAbondement;
+
+    // Tableau de sensibilité 3 scénarios d'abondement PERCOL
+    const scenariosAbondement = [
+      {label: 'Sans abondement', txAbond: 0, txCET: 2.10},
+      {label: 'Scénario A (retenu) — 1,5 %', txAbond: 1.5, txCET: 2.10},
+      {label: 'Scénario B — 3 %', txAbond: 3.0, txCET: 1.50},
+    ].map(s => {
+      const abondBrut = poolPercolTotal * s.txAbond / 100;
+      const coutFS = abondBrut * fs;
+      const coutAbond = abondBrut + coutFS;
+      const econE3 = econE3AvecFS - coutAbond;
+      // Spread tréso = (rE - txCET) × cetAnnuel × 0.5 (prorata jour, étalé sur l'année)
+      const spreadScen = cetAnnuelAjuste * (rE/100 - s.txCET/100) * 0.5;
+      const total = gainRGDU + spreadScen + econE3;
+      return {...s, abondBrut, coutAbond, econE3, spreadScen, total};
+    });
 
     // Legacy pool fields
     const gainPlacP = poolP * rE, rendVerseP = poolP * rS;
@@ -484,12 +512,14 @@ function App() {
       poolP, poolC, poolExcess, gainPlacP, rendVerseP, montantTransfP, forfaitPaye, coutPERCOL, coutCashRefP, econPERCOL,
       gainPlacC, rendVerseC, cotisPayeC, coutCETCash, coutCashRefC, surcoutCash,
       gainNetEtage3, gainNetEtage3AvecFS, econE3SansFS, econE3AvecFS,
+      econE3AvecAbondement, abondementBrut, coutAbondementTotal, gainTotalAvecAbondement,
+      scenariosAbondement,
       gainRGDU, spreadTotal, spreadReel, gainTotal, gainTotalPrudent,
       valeurJour, plafondPERCOL, tauxCotisSSEvitees,
       perWorker, leviers, impacts,
       cetAnPlafonneMoyen, cetAnExcessMoyen, pctSalariesAuPlafond,
     };
-  }, [tot,sim,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp,txSSEvitees]);
+  }, [tot,sim,txSalarie,txEtt,fSocial,txAdhCET,txChoixPERCOL,pctEligible,tauxHoraireCalc,pctIfm,pctIccp,txSSEvitees,txAbondementPercol]);
 
   const has = data.length > 0;
 
@@ -816,6 +846,58 @@ function App() {
           </div>
           <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6}}>
             Périmètre légal (transfert ≤ 10 j/an) : « assurances sociales + allocations familiales ». Défaut <strong style={{color:'#22c55e'}}>28,91 %</strong> = maladie 13 % + AF 5,25 % + vieillesse plafonnée 8,55 % + déplafonnée 2,11 % (sous PASS, ETT 2026). Ne sont PAS exonérés : AT/MP, FNAL, CSA, AGIRC-ARRCO, chômage, AGS (0,03 % en intérim), formation, apprentissage. Total cotisations patronales ETT : <strong>{(COTIS*100).toFixed(2)} %</strong>.
+          </div>
+        </div>
+
+        {/* Abondement PERCOL employeur */}
+        <div style={{padding:14,background:'#0f172a',border:'1px solid #6d28d9',borderRadius:12,marginBottom:20,fontSize:13,color:'#e9d5ff',lineHeight:1.6}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8,flexWrap:'wrap'}}>
+            <strong style={{color:'#fff'}}>Abondement employeur PERCOL</strong>
+            <input type="number" step="0.1" min="0" max="5" value={txAbondementPercol} onChange={e=>setTxAbondementPercol(parseFloat(e.target.value)||0)} style={{...S.input,width:80,textAlign:'right',fontSize:13}}/>
+            <span style={{fontSize:12,color:'#c4b5fd'}}>% × montant transféré</span>
+            <button onClick={()=>setTxAbondementPercol(0)} style={{padding:'4px 10px',background:'#1e293b',color:'#94a3b8',border:'1px solid #334155',borderRadius:6,fontSize:11,cursor:'pointer'}}>Sans 0 %</button>
+            <button onClick={()=>setTxAbondementPercol(1.5)} style={{padding:'4px 10px',background:'#3b0764',color:'#e9d5ff',border:'1px solid #6d28d9',borderRadius:6,fontSize:11,cursor:'pointer'}}>Scénario A 1,5 %</button>
+            <button onClick={()=>setTxAbondementPercol(3.0)} style={{padding:'4px 10px',background:'#1e1b3d',color:'#a78bfa',border:'1px solid #5b21b6',borderRadius:6,fontSize:11,cursor:'pointer'}}>Scénario B 3 %</button>
+          </div>
+          <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6,marginBottom:10}}>
+            Versé par l'employeur à chaque transfert CET → PERCOL, sous condition de 910 h dans l'année. Exonéré de cotisations sociales mais soumis au <strong>forfait social {fSocial} %</strong>. Plafonné légalement à 16 % du PASS/an (≈ 7 540 €/an/salarié, jamais atteint en pratique).<br/>
+            Coût employeur courant : <strong style={{color:'#fbbf24'}}>{fmtE(percol.coutAbondementTotal)}</strong> (abondement {fmtE(percol.abondementBrut)} + forfait social {fmtE(percol.coutAbondementTotal - percol.abondementBrut)})
+          </div>
+
+          {/* Tableau de sensibilité 3 scénarios */}
+          <div style={{marginTop:12,padding:12,background:'#1e1b3d',borderRadius:8}}>
+            <div style={{fontSize:12,fontWeight:600,color:'#fff',marginBottom:8}}>📊 Tableau de sensibilité — 3 scénarios d'abondement</div>
+            <table style={{width:'100%',fontSize:11,color:'#d4d4d8',borderCollapse:'collapse'}}>
+              <thead>
+                <tr style={{borderBottom:'1px solid #6d28d9',color:'#a78bfa',textAlign:'right'}}>
+                  <th style={{textAlign:'left',padding:'6px 8px'}}>Scénario</th>
+                  <th style={{padding:'6px 8px'}}>Taux CET</th>
+                  <th style={{padding:'6px 8px'}}>Tx abond.</th>
+                  <th style={{padding:'6px 8px'}}>Abond. brut</th>
+                  <th style={{padding:'6px 8px'}}>Coût total abond.</th>
+                  <th style={{padding:'6px 8px'}}>Étage 3 net</th>
+                  <th style={{padding:'6px 8px'}}>Spread (E2)</th>
+                  <th style={{padding:'6px 8px'}}>Total business</th>
+                </tr>
+              </thead>
+              <tbody>
+                {percol.scenariosAbondement.map((s,i)=>(
+                  <tr key={i} style={{borderBottom:'1px solid #334155',textAlign:'right'}}>
+                    <td style={{textAlign:'left',padding:'6px 8px',color:'#fff'}}>{s.label}</td>
+                    <td style={{padding:'6px 8px'}}>{s.txCET.toFixed(2)} %</td>
+                    <td style={{padding:'6px 8px'}}>{s.txAbond.toFixed(1)} %</td>
+                    <td style={{padding:'6px 8px',color:'#a78bfa'}}>{fmtE(s.abondBrut)}</td>
+                    <td style={{padding:'6px 8px',color:'#f87171'}}>{fmtE(s.coutAbond)}</td>
+                    <td style={{padding:'6px 8px',color:s.econE3 > 0 ? '#22c55e':'#f87171'}}>{fmtE(s.econE3)}</td>
+                    <td style={{padding:'6px 8px',color:s.spreadScen > 0 ? '#22c55e':'#f87171'}}>{fmtE(s.spreadScen)}</td>
+                    <td style={{padding:'6px 8px',fontWeight:600,color:s.total > 0 ? '#22c55e':'#f87171'}}>{fmtE(s.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{marginTop:8,fontSize:10,color:'#94a3b8',fontStyle:'italic'}}>
+              Spread tréso calculé avec prorata journalier (×0,5 — versements étalés sur l'année). Étage 1 RGDU non comparé (identique entre scénarios). Total business = RGDU + Spread + Étage 3 avec abondement.
+            </div>
           </div>
         </div>
 
