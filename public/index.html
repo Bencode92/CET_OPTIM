@@ -417,12 +417,13 @@ function App() {
     // Économie SS évitée nette du forfait social
     const econE3AvecFS = poolPercolTotal * (tauxCotisSSEvitees - fs);
     // Coût de l'abondement employeur PERCOL :
-    //   - Coût brut = abondement = pool × txAbond
-    //   - Coût forfait social sur l'abondement = abondement × fs
-    //   - L'abondement est exonéré de cotisations sociales mais subit le forfait social
+    //   - Cadre retenu : pas de PEE/PERCO formel → l'abondement est traité comme un
+    //     complément de salaire à l'occasion du transfert PERCOL
+    //   - Soumis aux cotisations patronales CLASSIQUES (~44,78 %), pas au forfait social
+    //   - Coût total employeur = abondement brut × (1 + cotis_patronales)
     const abondementBrut = poolPercolTotal * txAbond;
-    const coutAbondementFS = abondementBrut * fs;
-    const coutAbondementTotal = abondementBrut + coutAbondementFS;
+    const coutAbondementCotisations = abondementBrut * COTIS;
+    const coutAbondementTotal = abondementBrut + coutAbondementCotisations;
     // Économie nette finale (étage 3 avec abondement employeur)
     const econE3AvecAbondement = econE3AvecFS - coutAbondementTotal;
 
@@ -441,8 +442,9 @@ function App() {
       {label: 'Scénario B — 3 %', txAbond: 3.0, txCET: 1.50},
     ].map(s => {
       const abondBrut = poolPercolTotal * s.txAbond / 100;
-      const coutFS = abondBrut * fs;
-      const coutAbond = abondBrut + coutFS;
+      // Cotisations patronales classiques sur l'abondement (pas forfait social)
+      const coutCotis = abondBrut * COTIS;
+      const coutAbond = abondBrut + coutCotis;
       const econE3 = econE3AvecFS - coutAbond;
       // Spread tréso = (rE - txCET) × cetAnnuel × 0.5 (prorata jour, étalé sur l'année)
       const spreadScen = cetAnnuelAjuste * (rE/100 - s.txCET/100) * 0.5;
@@ -860,8 +862,8 @@ function App() {
             <button onClick={()=>setTxAbondementPercol(3.0)} style={{padding:'4px 10px',background:'#1e1b3d',color:'#a78bfa',border:'1px solid #5b21b6',borderRadius:6,fontSize:11,cursor:'pointer'}}>Scénario B 3 %</button>
           </div>
           <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6,marginBottom:10}}>
-            Versé par l'employeur à chaque transfert CET → PERCOL, sous condition de 910 h dans l'année. Exonéré de cotisations sociales mais soumis au <strong>forfait social {fSocial} %</strong>. Plafonné légalement à 16 % du PASS/an (≈ 7 540 €/an/salarié, jamais atteint en pratique).<br/>
-            Coût employeur courant : <strong style={{color:'#fbbf24'}}>{fmtE(percol.coutAbondementTotal)}</strong> (abondement {fmtE(percol.abondementBrut)} + forfait social {fmtE(percol.coutAbondementTotal - percol.abondementBrut)})
+            Versé par l'employeur à chaque transfert CET → PERCOL, sous condition de 910 h dans l'année. <strong>Cadre retenu : complément de salaire</strong> (pas de PEE/PERCO formel) → soumis aux <strong>cotisations patronales classiques ({(COTIS*100).toFixed(2)} %)</strong>, pas au forfait social.<br/>
+            Coût employeur courant : <strong style={{color:'#fbbf24'}}>{fmtE(percol.coutAbondementTotal)}</strong> (abondement brut {fmtE(percol.abondementBrut)} + cotisations patronales {fmtE(percol.coutAbondementTotal - percol.abondementBrut)})
           </div>
 
           {/* Tableau de sensibilité 3 scénarios */}
@@ -896,7 +898,7 @@ function App() {
               </tbody>
             </table>
             <div style={{marginTop:8,fontSize:10,color:'#94a3b8',fontStyle:'italic'}}>
-              Spread tréso calculé avec prorata journalier (×0,5 — versements étalés sur l'année). Étage 1 RGDU non comparé (identique entre scénarios). Total business = RGDU + Spread + Étage 3 avec abondement.
+              Coût total abondement = abondement brut × (1 + {(COTIS*100).toFixed(2)} % cotisations patronales). Spread tréso calculé avec prorata journalier (×0,5 — versements étalés sur l'année). Étage 1 RGDU non comparé (identique entre scénarios). Total business = RGDU + Spread + Étage 3 avec abondement.
             </div>
           </div>
         </div>
